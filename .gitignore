@@ -1,0 +1,7 @@
+**/.DS_Store
+input/*
+output/*
+
+!input/balloon.jpeg
+!output/balloon-stylized.jpeg
+!output/balloon-voronoi.jpeg
