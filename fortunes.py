@@ -7,6 +7,7 @@ from utils import *
 
 ARC_COLOR = (0, 128, 255)
 COMPLETE_COLOR = ARC_COLOR#(0, 0, 0)
+ANIM_SPEED = 5
 
 def drawArc(img, arc, sweep, xMin, xMax):
     for i in range(max(0, int(xMin)), min(int(xMax), img.shape[0]), 2):
@@ -54,7 +55,7 @@ class Fortunes:
 
 
     def step_animation(self, target_sweep):
-        for y in range(int(self.lastY), -int(target_sweep), 2):
+        for y in range(int(self.lastY), -int(target_sweep), ANIM_SPEED):
             sweep = -y
 
             img = np.copy(self.img)
@@ -153,7 +154,9 @@ class Fortunes:
         if arc_latest_event > id: # this event is outdated and no longer valid. Arc has new, later circle events
             return
         
-        self.beachline.remove(arc, intersection)
+        arcs = self.beachline.remove(arc, intersection)
+        for arc in arcs:
+            self.check_circle_event(arc)
 
 
 

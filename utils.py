@@ -243,6 +243,8 @@ class Beachline:
         self.completed_edges.append(edge_left)
         self.completed_edges.append(edge_right)
 
+        return [arc_left, arc_right]
+
 
     def insert(self, site):
         sweepY = site.y
@@ -292,7 +294,7 @@ class Beachline:
 
             arc_left = Arc(focus=existing_arc.focus, id=self.arc_counter, prev_arc=existing_arc.prev_arc, next_arc=new_arc)
             self.arc_counter += 1
-            
+
             existing_arc.prev_arc = new_arc # make existing arc the new right arc split, so we don't have to modify existing's right endpoint
             
             new_endpoint_left = Endpoint(edge=edge_left, left_arc=arc_left, right_arc=new_arc)
