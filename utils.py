@@ -4,6 +4,7 @@ import heapq
 import itertools
 
 import numpy as np
+import cv2
 
 class KeyList(object):
     # bisect doesn't accept a key function before 3.10,
@@ -96,6 +97,9 @@ def arcIntersect(arc1, arc2, sweepY):
         b = -2.0 * (focus1.x/z0 - focus2.x/z1)
         c = 1.0 * (focus1.x**2 + focus1.y**2 - sweepY**2) / z0 - 1.0 * (focus2.x**2 + focus2.y**2 - sweepY**2) / z1
 
+        if b*b - 4*a*c < 0:
+            print("ERROR: domain error", focus1, focus2, sweepY, b, b*b,4*a*c)
+            cv2.waitKey(0)
         px = 1.0 / (2*a) * (-b+math.sqrt(b*b - 4*a*c))
 
 
@@ -127,14 +131,18 @@ class Endpoint:
         self.left_arc = left_arc
         self.right_arc = right_arc
 
-    def calculateX(self, sweepY):
+    def calculateX(self, sweepY, outputY=False):
         # start = self.edge.start
         # vec = self.edge.vec
         if self.left_arc is not None and self.right_arc is not None:
             intersection = arcIntersect(self.left_arc, self.right_arc, sweepY)
-            return intersection.x
+
+            if not outputY:
+                return intersection.x
+            else:
+                return intersection.x, intersection.y
         else:
-            return -1000
+            return -1000 if not outputY else (-1000, 0)
 
 
 

@@ -19,7 +19,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 2
+n = 5#2
 
 # def trunc(p1, p2, line):
 #     # v1 = np.array([tup[0], tup[1]])
