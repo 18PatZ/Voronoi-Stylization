@@ -39,19 +39,21 @@ class Point:
 
 class Arc:
     focus = None
+    id = -1
     
     prev_arc = None
     next_arc = None
     
-    prev_edge = None
-    next_edge = None
+    prev_endpoint = None
+    next_endpoint = None
 
-    def __init__(self, focus, prev_arc=None, next_arc=None):
+    def __init__(self, focus, id=-1, prev_arc=None, next_arc=None, prev_endpoint=None, next_endpoint=None):
         self.focus = focus
+        self.id = id
         self.prev_arc = prev_arc
         self.next_arc = next_arc
-        # self.prev_edge = None
-        # self.next_edge = None
+        self.prev_endpoint = prev_endpoint
+        self.next_endpoint = next_endpoint
 
 
 
@@ -120,6 +122,35 @@ def arcIntersect(arc1, arc2, sweepY):
     return point
 
 
+def edgeIntersect(edge1, edge2):
+    o1 = npa(edge1.start)
+    d1 = edge1.vec
+
+    o2 = npa(edge2.start)
+    d2 = edge2.vec
+
+    ###
+    dx = o2[0] - o1[0]
+    dy = o2[1] - o1[1]
+
+    det = d2[0] * d1[1] - d2[1] * d1[0]
+
+    if det == 0:
+        return None
+
+    u = (dy * d2[0] - dx * d2[1]) / det
+    v = (dy * d1[0] - dx * d1[1]) / det
+    ###
+
+    if u < 0 or v < 0:
+        return None
+
+    point = o1 + u * d1
+    return point
+
+
+
+
 
 class Endpoint:
     edge = None
@@ -149,8 +180,10 @@ class Endpoint:
 
 class Beachline:
     endpoints = []
-    arcs = []
+    completed_edges = []
 
+    arc_counter = 0
+    
     def _insert(self, endpoint):
         self.endpoints.append(endpoint)
 
@@ -162,15 +195,65 @@ class Beachline:
         beach_index = bisect.bisect_right(key_list, value)
         return beach_index
 
+    
+    def nextElement(self, endpoint):
+        ind = self.endpoints.index(endpoint)
+        if ind < 0 or ind >= len(self.endpoints):
+            return None
+        return self.endpoints[ind + 1]
+
+    
+    def remove(self, arc, intersection):
+        endpoint_left = arc.prev_endpoint
+        endpoint_right = arc.next_endpoint
+
+        edge_left = endpoint_left.edge
+        edge_right = endpoint_right.edge
+
+        arc_left = endpoint_left.left_arc
+        arc_right = endpoint_right.right_arc
+
+        endpoint_left.right_arc = arc_right
+
+        arc_left.next_arc = arc_right
+        arc_right.prev_arc = arc_left
+
+        arc_right.prev_endpoint = endpoint_left
+
+        self.endpoints.remove(endpoint_right)
+
+        # new edge
+        edge_start = (intersection.x, intersection.y)
+
+        connecting_vec = npa(arc_left.focus) - npa(arc_right.focus) # right to left
+        
+        tangent = normalize(connecting_vec)
+        orthogonal = np.cross(np.array([tangent[0], tangent[1], 0]), np.array([0, 0, 1]))
+        
+        up_vec = normalize(orthogonal[:2])
+        down_vec = - up_vec
+
+        new_edge = Edge(pt(edge_start), down_vec)
+        endpoint_left.edge = new_edge
+
+        # complete old edges
+        edge_left.end = intersection
+        edge_right.end = intersection
+
+        self.completed_edges.append(edge_left)
+        self.completed_edges.append(edge_right)
+
 
     def insert(self, site):
         sweepY = site.y
-        new_arc = Arc(focus=site)
+        
+        new_arc = Arc(focus=site, id=self.arc_counter)
+        self.arc_counter += 1
 
         if len(self.endpoints) == 0: # this is first arc
             self._insert(Endpoint(edge=None, left_arc=None, right_arc=new_arc)) # we indicate a single arc with None for left arc
 
-            self.arcs.append(new_arc)
+            return [new_arc]
 
         else:
             beach_index = 0
@@ -207,46 +290,31 @@ class Beachline:
             edge_left = Edge(pt(edge_start), left_vec)
             edge_right = Edge(pt(edge_start), right_vec)
 
-            arc_left = Arc(focus=existing_arc.focus, prev_arc=existing_arc.prev_arc, next_arc=new_arc)
+            arc_left = Arc(focus=existing_arc.focus, id=self.arc_counter, prev_arc=existing_arc.prev_arc, next_arc=new_arc)
+            self.arc_counter += 1
+            
             existing_arc.prev_arc = new_arc # make existing arc the new right arc split, so we don't have to modify existing's right endpoint
             
             new_endpoint_left = Endpoint(edge=edge_left, left_arc=arc_left, right_arc=new_arc)
             new_endpoint_right = Endpoint(edge=edge_right, left_arc=new_arc, right_arc=existing_arc)
 
+            arc_left.prev_endpoint = existing_arc.prev_endpoint
+            arc_left.next_endpoint = new_endpoint_left
+
+            new_arc.prev_endpoint = new_endpoint_left
+            new_arc.next_endpoint = new_endpoint_right
+
+            existing_arc.prev_endpoint = new_endpoint_right
+            
+
             endpoint.right_arc = arc_left
             self._insert_at(beach_index + 1, new_endpoint_left)
             self._insert_at(beach_index + 2, new_endpoint_right)
 
-            self.arcs.append(arc_left)
-            self.arcs.append(new_arc)
-
-
-
-        
-            
+            return [arc_left, new_arc, existing_arc]
 
         
 
-
-        
-
-
-    # test_array = [(1,2),(3,4),(5.2,6),(5.2,7000),(5.3,8),(9,10)]
-    # print(bisect.bisect_right(KeyList(test_array, key=lambda x: x[0]+1), 6))
-
-
-
-class Event:
-    x = 0.0
-    p = None
-    a = None
-    valid = True
-    
-    def __init__(self, x, p, a):
-        self.x = x
-        self.p = p
-        self.a = a
-        self.valid = True
 
      
 
@@ -256,13 +324,13 @@ class PriorityQueue:
         self.entry_finder = {}
         self.counter = itertools.count()
 
-    def push(self, item, type):
+    def push(self, value, item, type):
         # check for duplicate
         if item in self.entry_finder: return
         count = next(self.counter)
         # use flipped y-coordinate as a primary key (heapq in python is min-heap)
-        combined = (item, type)
-        entry = [-item.y, count, combined]
+        combined = (value, item, type)
+        entry = [-value, count, combined]
         self.entry_finder[combined] = entry
         heapq.heappush(self.pq, entry)
 
@@ -303,6 +371,8 @@ if __name__ == '__main__':
     # test_array = []
     k = KeyList(test_array, key=lambda x: x[0])
     print(bisect.bisect_right(k, 9))
+
+
     # test_array.append((2,0))
     # print(bisect.bisect_right(k, 6))
     # a1 = Arc(pt((0, 1)))

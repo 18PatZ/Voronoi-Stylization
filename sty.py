@@ -19,7 +19,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 5#2
+n = 5
 
 # def trunc(p1, p2, line):
 #     # v1 = np.array([tup[0], tup[1]])
@@ -167,8 +167,9 @@ sites = np.array(sample_points)
 
 stylized = img.copy()
 
+c = (0, 128, 255)#(0, 0, 0)
 for point in sample_points:
-    img = cv2.circle(img, center=arrToCvTup(point), radius=8, color=(0, 0, 0), thickness=-1)
+    img = cv2.circle(img, center=arrToCvTup(point), radius=8, color=c, thickness=-1)
     # img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
 
 
@@ -275,7 +276,7 @@ for line in lines_2:
 
 
 # cv2.imshow('image',img)
-cv2.imshow('image2',img2)
+# cv2.imshow('image2',img2)
 # cv2.imshow('stylized', stylized)
 
 spl = filepath.split(".")
