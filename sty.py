@@ -4,7 +4,11 @@ import numpy as np
 import math
 import random
 
-filepath = "titanfall2.png"
+import time
+
+from Voronoi import Voronoi as Vr
+
+filepath = "balloon.jpeg"
 img = cv2.imread(f"input/{filepath}")
 
 sample_points = []
@@ -12,8 +16,20 @@ sample_points = []
 height, width, channels = img.shape
 diag = math.sqrt(height**2 + width**2)
 
-n = 300#50
+n = 50
 
+def cap(tup, img):
+    x = tup[0]
+    y = tup[1]
+    if x < 0:
+        x = 0
+    if x > img.shape[1] - 1:
+        x = img.shape[1]-1
+    if y < 0:
+        y = 0
+    if y > img.shape[0] - 1:
+        y = img.shape[0]-1
+    return (x,y)
 
 def voronoi_finite_polygons_2d(vor, radius=None):
     """
@@ -121,6 +137,16 @@ for i in range(0, n**2):
 
 
 sites = np.array(sample_points)
+
+start = time.time()
+vp = Vr(sites)
+vp.process()
+vp_lines = vp.get_output()
+
+lines_2 = [[[line[0], line[1]], [line[2], line[3]]] for line in vp_lines]
+print("Done in ", time.time()-start)
+
+start = time.time()
 vor = Voronoi(sites)
 
 center = vor.points.mean(axis=0)
@@ -165,44 +191,53 @@ for i in range(len(vor.ridge_points)):
         endpoint2 = ridge_center - direction * diag
         lines.append((endpoint, endpoint2))
 
+print("Done in ", time.time()-start)
 
-stylized = img.copy()
+# stylized = img.copy()
 
-regions, vertices = voronoi_finite_polygons_2d(vor)
-for region in regions:
-    polygon = vertices[region]
-    mask = np.zeros(img.shape[:2], dtype=np.uint8)
-    roi_corners = np.array([[arrToCvTup(p) for p in polygon]], dtype=np.int32)#np.array([[(10,10), (300,300), (10,300)]], dtype=np.int32)
-    # fill the ROI so it doesn't get wiped out when the mask is applied
-    ignore_mask_color = (255,) * channels
-    cv2.fillPoly(mask, roi_corners, ignore_mask_color)
+# regions, vertices = voronoi_finite_polygons_2d(vor)
+# for region in regions:
+#     polygon = vertices[region]
+#     mask = np.zeros(img.shape[:2], dtype=np.uint8)
+#     roi_corners = np.array([[arrToCvTup(p) for p in polygon]], dtype=np.int32)#np.array([[(10,10), (300,300), (10,300)]], dtype=np.int32)
+#     # fill the ROI so it doesn't get wiped out when the mask is applied
+#     ignore_mask_color = (255,) * channels
+#     cv2.fillPoly(mask, roi_corners, ignore_mask_color)
 
-    avg = cv2.mean(img, mask)
-    cv2.fillPoly(stylized, roi_corners, avg)
+#     avg = cv2.mean(img, mask)
+#     cv2.fillPoly(stylized, roi_corners, avg)
 
     # masked_image = cv2.bitwise_and(img, mask)
     # cv2.imshow('masked', masked_image)
     # cv2.waitKey(0)
 
-# for point in sample_points:
-#     img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
+for point in sample_points:
+    img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
+img2 = np.copy(img)
 
 for line in lines:
     p1 = line[0]
     p2 = line[1]
     
     img = cv2.line(img, arrToCvTup(p1), arrToCvTup(p2), color=(0, 0, 0), thickness=1)
+
+for line in lines_2:
+    p1 = line[0]
+    p2 = line[1]
+    
+    img2 = cv2.line(img2, cap(arrToCvTup(p1), img2), cap(arrToCvTup(p2), img2), color=(0, 0, 0), thickness=1)
     # stylized = cv2.line(stylized, arrToCvTup(p1), arrToCvTup(p2), color=(0, 0, 0), thickness=1)
 
 
 cv2.imshow('image',img)
-cv2.imshow('stylized', stylized)
+cv2.imshow('image2',img2)
+# cv2.imshow('stylized', stylized)
 
 spl = filepath.split(".")
 filename = spl[0]
 extension = spl[1]
 cv2.imwrite(f'output/{filename}-{n}-voronoi.{extension}', img)
-cv2.imwrite(f'output/{filename}-{n}-stylized.{extension}', stylized)
+# cv2.imwrite(f'output/{filename}-{n}-stylized.{extension}', stylized)
 
 
 
