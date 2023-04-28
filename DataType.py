@@ -28,6 +28,7 @@ class Arc:
     e = None
     s0 = None
     s1 = None
+    site = None
     
     def __init__(self, p, a=None, b=None):
         self.p = p
@@ -41,6 +42,8 @@ class Segment:
     start = None
     end = None
     done = False
+    siteL = None
+    siteR = None
     
     def __init__(self, p):
         self.start = p

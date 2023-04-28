@@ -85,6 +85,7 @@ class Voronoi:
     def arc_insert(self, p):
         if self.arc is None:
             self.arc = Arc(p)
+            self.arc.site = p
         else:
             # find the current arcs at p.y
             i = self.arc
@@ -93,8 +94,8 @@ class Voronoi:
                 if flag:
                     # new parabola intersects arc i
                     flag, zz = self.intersect(p, i.pnext)
-                    if (i.pnext is not None) and (not flag):
-                        i.pnext.pprev = Arc(i.p, i, i.pnext)
+                    if (i.pnext is not None) and (not flag): 
+                        i.pnext.pprev = Arc(i.p, i, i.pnext) # arc_right is between arc i and its right
                         i.pnext = i.pnext.pprev
                     else:
                         i.pnext = Arc(i.p, i)
@@ -136,6 +137,8 @@ class Voronoi:
             start = Point(x, y)
 
             seg = Segment(start)
+            seg.siteL = i.p
+            seg.siteR = p.p
             i.s1 = i.pnext.s0 = seg
             self.output.append(seg)
 
@@ -182,14 +185,15 @@ class Voronoi:
         if (i is None): return False, None
         if (i.p.x == p.x): return False, None
 
-        a = 0.0
-        b = 0.0
+        a = 0.0 # left bounds
+        b = 0.0 # right bounds
 
         if i.pprev is not None:
             a = (self.intersection(i.pprev.p, i.p, 1.0*p.x)).y
         if i.pnext is not None:
             b = (self.intersection(i.p, i.pnext.p, 1.0*p.x)).y
 
+        # make sure p is actually in bounds of arc i
         if (((i.pprev is None) or (a <= p.y)) and ((i.pnext is None) or (p.y <= b))):
             py = p.y
             px = 1.0 * ((i.p.x)**2 + (i.p.y-py)**2 - p.x**2) / (2*i.p.x - 2*p.x)
@@ -244,5 +248,7 @@ class Voronoi:
         for o in self.output:
             p0 = o.start
             p1 = o.end
-            res.append((p0.x, p0.y, p1.x, p1.y))
+            l = (p0.x, p0.y, p1.x, p1.y)
+            res.append(l)
+            print(l, o.siteL, o.siteR)
         return res

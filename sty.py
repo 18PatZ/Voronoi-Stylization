@@ -7,6 +7,7 @@ import random
 import time
 
 from Voronoi import Voronoi as Vr
+from fortunes import Fortunes
 
 filepath = "balloon.jpeg"
 img = cv2.imread(f"input/{filepath}")
@@ -16,20 +17,45 @@ sample_points = []
 height, width, channels = img.shape
 diag = math.sqrt(height**2 + width**2)
 
-n = 50
+random.seed(10)
+
+n = 2
+
+# def trunc(p1, p2, line):
+#     # v1 = np.array([tup[0], tup[1]])
+#     # v2 = np.array([tup[0], tup[1]])
+#     v = p2 - p1
+#     x = tup[0]
+#     y = tup[1]
+#     if x < 0:
+#         x = 0
+#     if x > img.shape[1] - 1:
+#         x = img.shape[1]-1
+#     if y < 0:
+#         y = 0
+#     if y > img.shape[0] - 1:
+#         y = img.shape[0]-1
+#     return (x,y)
 
 def cap(tup, img):
-    x = tup[0]
-    y = tup[1]
-    if x < 0:
-        x = 0
-    if x > img.shape[1] - 1:
-        x = img.shape[1]-1
-    if y < 0:
-        y = 0
-    if y > img.shape[0] - 1:
-        y = img.shape[0]-1
-    return (x,y)
+    w = img.shape[1]
+    h = img.shape[0]
+    longest = math.sqrt(w**2 + h**2)
+    tupL = math.sqrt(tup[0]**2 + tup[1]**2)
+    if tupL >= longest:
+        tup = np.array([tup[0] / tupL * longest, tup[1] / tupL * longest])
+    return tup
+    # x = tup[0]
+    # y = tup[1]
+    # if x < 0:
+    #     x = 0
+    # if x > img.shape[1] - 1:
+    #     x = img.shape[1]-1
+    # if y < 0:
+    #     y = 0
+    # if y > img.shape[0] - 1:
+    #     y = img.shape[0]-1
+    # return (x,y)
 
 def voronoi_finite_polygons_2d(vor, radius=None):
     """
@@ -138,12 +164,31 @@ for i in range(0, n**2):
 
 sites = np.array(sample_points)
 
+
+stylized = img.copy()
+
+for point in sample_points:
+    img = cv2.circle(img, center=arrToCvTup(point), radius=8, color=(0, 0, 0), thickness=-1)
+    # img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
+
+
+
 start = time.time()
-vp = Vr(sites)
+# vp = Vr(sites)
+# vp.process()
+# vp_lines = vp.get_output()
+vp = Fortunes(sites, img=img)
 vp.process()
-vp_lines = vp.get_output()
+vp_lines = vp.edges()
+img = vp.img
+print(vp_lines)
+# if True:
+#     exit()
 
 lines_2 = [[[line[0], line[1]], [line[2], line[3]]] for line in vp_lines]
+
+for l in lines_2:
+    print(l)
 print("Done in ", time.time()-start)
 
 start = time.time()
@@ -193,7 +238,6 @@ for i in range(len(vor.ridge_points)):
 
 print("Done in ", time.time()-start)
 
-# stylized = img.copy()
 
 # regions, vertices = voronoi_finite_polygons_2d(vor)
 # for region in regions:
@@ -211,8 +255,7 @@ print("Done in ", time.time()-start)
     # cv2.imshow('masked', masked_image)
     # cv2.waitKey(0)
 
-for point in sample_points:
-    img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
+
 img2 = np.copy(img)
 
 for line in lines:
@@ -225,11 +268,13 @@ for line in lines_2:
     p1 = line[0]
     p2 = line[1]
     
-    img2 = cv2.line(img2, cap(arrToCvTup(p1), img2), cap(arrToCvTup(p2), img2), color=(0, 0, 0), thickness=1)
+    print(arrToCvTup(cap(p1, img2)), arrToCvTup(cap(p2, img2)))
+
+    img2 = cv2.line(img2, arrToCvTup(cap(p1, img2)), arrToCvTup(cap(p2, img2)), color=(0, 0, 0), thickness=1)
     # stylized = cv2.line(stylized, arrToCvTup(p1), arrToCvTup(p2), color=(0, 0, 0), thickness=1)
 
 
-cv2.imshow('image',img)
+# cv2.imshow('image',img)
 cv2.imshow('image2',img2)
 # cv2.imshow('stylized', stylized)
 
