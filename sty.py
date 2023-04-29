@@ -9,7 +9,7 @@ import time
 from Voronoi import Voronoi as Vr
 from fortunes import Fortunes
 
-filepath = "balloon.jpeg"
+filepath = "titanfall2.png"
 img = cv2.imread(f"input/{filepath}")
 
 sample_points = []
@@ -153,13 +153,22 @@ def arrToCvTup(a):
 
 
 # for i in range(0, n):
-#     x = i * width / n
+#     x = (i+0.5) * width / n
 #     for j in range(0, n):
-#         y = j * height / n
+#         y = (j+0.5) * height / n
 
 #         sample_points.append([x, y])
 for i in range(0, n**2):
     sample_points.append([random.random() * width, random.random() * height])
+#     sample_points.append([random.random() * width, 200])
+
+# sample_points = [
+#     [200, 200],
+#     [400, 200],
+#     [600, 200],
+#     [800, 200],
+#     [350, 210],
+# ]
 
 
 sites = np.array(sample_points)
@@ -167,75 +176,68 @@ sites = np.array(sample_points)
 
 stylized = img.copy()
 
-c = (0, 128, 255)#(0, 0, 0)
-for point in sample_points:
-    img = cv2.circle(img, center=arrToCvTup(point), radius=8, color=c, thickness=-1)
-    # img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
-
-
-
 start = time.time()
-# vp = Vr(sites)
-# vp.process()
-# vp_lines = vp.get_output()
+
+# vp2 = Vr(sites)
+# vp2.process()
+# vp_lines = vp2.get_output()
+
 vp = Fortunes(sites, img=img)
-vp.process()
+# vp.process()
 vp_lines = vp.edges()
-img = vp.img
-print(vp_lines)
+# img = vp.img
+# print(vp_lines)
 # if True:
 #     exit()
 
 lines_2 = [[[line[0], line[1]], [line[2], line[3]]] for line in vp_lines]
 
-for l in lines_2:
-    print(l)
 print("Done in ", time.time()-start)
-
-start = time.time()
-vor = Voronoi(sites)
-
-center = vor.points.mean(axis=0)
 
 lines = []
 
-for i in range(len(vor.ridge_points)):
-    rpoints = vor.ridge_points[i]
-    rverts = vor.ridge_vertices[i]
+# start = time.time()
+# vor = Voronoi(sites)
 
-    s1 = sites[rpoints[0]]
-    s2 = sites[rpoints[1]]
-    ridge_center = (s1 + s2) / 2
+# center = vor.points.mean(axis=0)
 
-    perp = normalize(s2 - s1)
-    direction = np.cross(np.array([perp[0], perp[1], 0]), np.array([0, 0, 1]))
-    direction = np.array([direction[0], direction[1]])
+# for i in range(len(vor.ridge_points)):
+#     rpoints = vor.ridge_points[i]
+#     rverts = vor.ridge_vertices[i]
 
-    v1 = None
-    v2 = None
+#     s1 = sites[rpoints[0]]
+#     s2 = sites[rpoints[1]]
+#     ridge_center = (s1 + s2) / 2
 
-    if rverts[0] >= 0:
-        v1 = vor.vertices[rverts[0]]
-    if rverts[1] >= 0:
-        v2 = vor.vertices[rverts[1]]
+#     perp = normalize(s2 - s1)
+#     direction = np.cross(np.array([perp[0], perp[1], 0]), np.array([0, 0, 1]))
+#     direction = np.array([direction[0], direction[1]])
 
-    if v1 is not None and v2 is not None:
-        lines.append((v1, v2))
-    elif v1 is not None or v2 is not None:
-        endpoint = v1 if v1 is not None else v2
-        vec = normalize(endpoint - ridge_center)
-        other_endpoint_dir = np.sign(np.dot(ridge_center - center, direction)) * direction
-        # if np.dot(vec, direction) > 0.9: # same direction
-        #     other_endpoint_dir = -direction
-        # else: 
-        #     other_endpoint_dir = direction
-        endpoint2 = ridge_center + other_endpoint_dir * diag
+#     v1 = None
+#     v2 = None
 
-        lines.append((endpoint, endpoint2))
-    else:
-        endpoint = ridge_center + direction * diag
-        endpoint2 = ridge_center - direction * diag
-        lines.append((endpoint, endpoint2))
+#     if rverts[0] >= 0:
+#         v1 = vor.vertices[rverts[0]]
+#     if rverts[1] >= 0:
+#         v2 = vor.vertices[rverts[1]]
+
+#     if v1 is not None and v2 is not None:
+#         lines.append((v1, v2))
+#     elif v1 is not None or v2 is not None:
+#         endpoint = v1 if v1 is not None else v2
+#         vec = normalize(endpoint - ridge_center)
+#         other_endpoint_dir = np.sign(np.dot(ridge_center - center, direction)) * direction
+#         # if np.dot(vec, direction) > 0.9: # same direction
+#         #     other_endpoint_dir = -direction
+#         # else: 
+#         #     other_endpoint_dir = direction
+#         endpoint2 = ridge_center + other_endpoint_dir * diag
+
+#         lines.append((endpoint, endpoint2))
+#     else:
+#         endpoint = ridge_center + direction * diag
+#         endpoint2 = ridge_center - direction * diag
+#         lines.append((endpoint, endpoint2))
 
 print("Done in ", time.time()-start)
 
@@ -274,10 +276,16 @@ for line in lines_2:
     img2 = cv2.line(img2, arrToCvTup(cap(p1, img2)), arrToCvTup(cap(p2, img2)), color=(0, 0, 0), thickness=1)
     # stylized = cv2.line(stylized, arrToCvTup(p1), arrToCvTup(p2), color=(0, 0, 0), thickness=1)
 
+# c = (0, 128, 255)
+c = (0, 0, 0)
+for point in sample_points:
+    img = cv2.circle(img, center=arrToCvTup(point), radius=4, color=c, thickness=-1)
+    # img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
 
 # cv2.imshow('image',img)
 # cv2.imshow('image2',img2)
 # cv2.imshow('stylized', stylized)
+vp.process()
 
 spl = filepath.split(".")
 filename = spl[0]
