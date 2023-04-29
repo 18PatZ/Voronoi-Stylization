@@ -143,6 +143,14 @@ class Fortunes:
                     edge.start = pt(intersection)
                     edge.boundary_start = line
 
+        
+            if not isPointInPolygon(edge.end, bounding_box):
+                intersection, line = edgeIntersectBoundingBox(edge, bounding_box, max_ray_length=np.linalg.norm(npa(edge.end) - npa(edge.start)))
+
+                if intersection is not None: # edge ends outside, need to cut it 
+                    edge.end = pt(intersection)
+                    edge.boundary_end = line
+
         for i in range(len(self.beachline.endpoints)):
             endpoint = self.beachline.endpoints[i]
             edge = endpoint.edge
