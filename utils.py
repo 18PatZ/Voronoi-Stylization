@@ -546,6 +546,14 @@ def npa(pt):
 def npt(tup):
     return np.array([tup[0], tup[1]])
 
+def arrToCvTup(a):
+    return (int(a[0]), int(a[1]))
+
+def flipY(pt):
+    return np.array([pt[0], -pt[1]])
+
+def conv2d3d(vec2d):
+    return np.array([vec2d[0], vec2d[1], 0])
 
 def vecAngle(vec):
     v = normalize(vec)
@@ -562,6 +570,34 @@ def vecAngle(vec):
 
     return angle
 
+def cosWithHorizontal(vec):
+        dot = normalize(vec)[0] # dot with (1, 0) is just x component
+        return dot # for sorting by angle, we just need cos(angle), since cos is monotonic from 0 to pi
+
+
+def vectorPortionInRegion(start, end, bounding_box):    
+    start_inside = isPointInPolygon(pt(start), bounding_box)
+    end_inside = isPointInPolygon(pt(end), bounding_box)
+
+    if start_inside and end_inside:
+        return start, end
+
+    displacement = end-start
+    
+    intersection, _ = rayIntersectBoundingBox(start, displacement, bounding_box, only_closest=True, max_ray_length=1)
+    if intersection is None:
+        return None, None
+
+    if not start_inside:
+        start = intersection
+    if not end_inside:
+        nudged_start = start + normalize(displacement) * 0.01 # since start already intersects box, needs a little nudge
+        intersection, _ = rayIntersectBoundingBox(nudged_start, displacement, bounding_box, only_closest=True, max_ray_length=1)
+        
+        if intersection is not None:
+            end = intersection
+        
+    return start, end
 
 if __name__ == '__main__':
     test_array = [(1,2),(3,4),(5.2,6),(5.2,7000),(5.3,8),(9,10)]

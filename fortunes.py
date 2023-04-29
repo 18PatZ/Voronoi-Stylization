@@ -10,20 +10,12 @@ EDGE_COLOR = (0, 128, 255)
 COMPLETE_COLOR = (0, 255, 255)
 SITE_COLOR = (0, 0, 0)
 
-ANIM_SPEED = 50
+ANIM_SPEED = 10
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
 TEXT_OFFSET = np.array([10, 10])
 
-def arrToCvTup(a):
-    return (int(a[0]), int(a[1]))
-
-def flipY(pt):
-    return np.array([pt[0], -pt[1]])
-
-def conv2d3d(vec2d):
-    return np.array([vec2d[0], vec2d[1], 0])
 
 def drawText(img, position, text, color=(255,255,255), scale=1):
 
@@ -58,37 +50,6 @@ def resizeImgToScreen(img):
     
     return img
 
-def cosWithHorizontal(vec):
-        dot = normalize(vec)[0] # dot with (1, 0) is just x component
-        return dot # for sorting by angle, we just need cos(angle), since cos is monotonic from 0 to pi
-
-
-def vectorPortionInRegion(start, end, bounding_box):    
-    start_inside = isPointInPolygon(pt(start), bounding_box)
-    end_inside = isPointInPolygon(pt(end), bounding_box)
-
-    if start_inside and end_inside:
-        return start, end
-
-    displacement = end-start
-    
-    intersection, _ = rayIntersectBoundingBox(start, displacement, bounding_box, only_closest=True, max_ray_length=1)
-    if intersection is None:
-        return None, None
-
-    if not start_inside:
-        start = intersection
-    if not end_inside:
-        nudged_start = start + normalize(displacement) * 0.01 # since start already intersects box, needs a little nudge
-        intersection, _ = rayIntersectBoundingBox(nudged_start, displacement, bounding_box, only_closest=True, max_ray_length=1)
-        
-        if intersection is not None:
-            end = intersection
-        
-    return start, end
-
-
-
 
 def drawArc(img, arc, sweep, xMin, xMax):
     if sweep == arc.focus.y:
@@ -104,14 +65,6 @@ def drawArc(img, arc, sweep, xMin, xMax):
 
         img = cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), color=ARC_COLOR, thickness=DRAW_THICKNESS)
 
-def cap(tup, img):
-    w = img.shape[1]
-    h = img.shape[0]
-    longest = math.sqrt(w**2 + h**2)
-    tupL = math.sqrt(tup[0]**2 + tup[1]**2)
-    if tupL >= longest:
-        tup = np.array([tup[0] / tupL * longest, tup[1] / tupL * longest])
-    return tup
 
 
 
@@ -142,8 +95,8 @@ class Fortunes:
         for i in range(len(sites)):
             site = sites[i]
             self.events.push(
-                value = -site[1], # image has y down as positive, we flip
-                item = (pt((site[0], -site[1])), i), 
+                value = site[1],
+                item = (pt(site), i), 
                 type = "SITE") 
 
 
@@ -278,7 +231,7 @@ class Fortunes:
             if len(face_edges) == 0:
                 continue
 
-            site = flipY(self.sites[id])
+            site = self.sites[id]
 
             for i in range(len(face_edges)):
                 edge = face_edges[i]
@@ -315,7 +268,7 @@ class Fortunes:
 
             self.connect_polygon_edges(id, refined_edges)
 
-            self.faces[id] = Face(site = flipY(self.sites[id]), id=id, edges=refined_edges)
+            self.faces[id] = Face(site = self.sites[id], id=id, edges=refined_edges)
 
 
     def draw_animation_frame(self, y):
@@ -376,7 +329,7 @@ class Fortunes:
 
         for i in range(len(self.sites)):
             site = self.sites[i]
-            img = drawText(img, site, "S"+str(i), scale=1)
+            img = drawText(img, flipY(site), f"S{i}", scale=1)
         
         for edge in self.completed_edges:
             start = npa(edge.start)
@@ -540,13 +493,19 @@ class Fortunes:
         
 
 
-    def edges(self):
-        edges = []
-        for endpoint in self.beachline.endpoints:
-            if endpoint.edge is not None:
-                start = npa(endpoint.edge.start)
-                vec = endpoint.edge.vec
-                end = start + vec * 500
+    def get_faces(self):
+        return self.faces
 
-                edges.append([start[0], -start[1], end[0], -end[1]]) # image has y down as positive, we flip
+    def get_edges(self):
+        edges = [] # caution - duplicates
+        for id in self.faces:
+            for edge in self.faces[id].edges:
+                edges.append(edge)
         return edges
+
+    def get_vertices(self):
+        vertices = [] # caution - duplicates
+        for id in self.faces:
+            for edge in self.faces[id].edges:
+                vertices.append(edge.start)
+        return vertices
