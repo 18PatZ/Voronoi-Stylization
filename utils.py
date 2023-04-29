@@ -58,6 +58,32 @@ class Arc:
         self.next_endpoint = next_endpoint
 
 
+def order2(a, b):
+    if a <= b:
+        return (a, b)
+    return (b, a)
+
+
+class Face:
+    site = None
+    id = None
+    centroid = None
+    
+    edges = []
+
+    def __init__(self, site=None, id=None, edges=None):
+        self.site = site
+        self.id = id
+        self.edges = edges
+        
+        if len(self.edges) > 0:
+            self.centroid = np.array([0., 0.])
+            for edge in self.edges:
+                self.centroid += edge.start + edge.end
+            self.centroid /= (2 * len(self.edges))
+        else:
+            self.centroid = None
+    
 
 class Edge:
     start = None
@@ -65,20 +91,39 @@ class Edge:
 
     vec = None
 
-    boundary = None
+    boundary_start = None
+    boundary_end = None
     ending_sweep = None
 
     site1_id = None
     site2_id = None
+    site_ids = []
 
-    def __init__(self, start, vec, site1_id=None, site2_id=None):
+    def __init__(self, start, vec=None, end=None, site1_id=None, site2_id=None):
+        assert(site1_id is not None and site2_id is not None)
         self.start = start
         self.vec = vec
+        self.end = end
+        if vec is None and end is not None:
+            self.vec = normalize(end - start)
         self.site1_id = site1_id
         self.site2_id = site2_id
+        self.site_ids = order2(self.site1_id, self.site2_id)
 
     def __str__(self):
         return f"<S {self.start} | V {self.vec}>"
+
+    def np_copy(self, end_value=None):
+        clone = Edge(start=npa(self.start), vec=self.vec, site1_id=self.site1_id, site2_id=self.site2_id)
+        clone.site_ids = self.site_ids
+        clone.end = npa(self.end) if self.end is not None else end_value
+        clone.boundary_start = self.boundary_start
+        clone.boundary_end = self.boundary_end
+        clone.ending_sweep = clone.ending_sweep
+        return clone
+
+    def same_ids(self, other_edge):
+        return self.site_ids[0] == other_edge.site_ids[0] and self.site_ids[1] == other_edge.site_ids[1]
 
 
 def arcY(arc, sweepY, x):
@@ -200,13 +245,14 @@ def rayIntersectBoundingBox(origin, direction, bounding_box, only_closest=False,
     closest_intersect = (None, None)
     closest_u = None
 
-    for line in bounding_box:
+    for line_index in range(len(bounding_box)):
+        line = bounding_box[line_index]
         u, v, intersection = rayIntersectLineSegment(origin, direction, line)
 
         if intersection is not None and (max_ray_length is None or u < max_ray_length):
             if closest_u is None or u < closest_u:
                 closest_u = u
-                closest_intersect = (intersection, line)
+                closest_intersect = (intersection, (line, line_index))
 
                 if not only_closest:
                     return closest_intersect
@@ -496,6 +542,9 @@ def pt(arr):
 
 def npa(pt):
     return np.array([pt.x, pt.y])
+
+def npt(tup):
+    return np.array([tup[0], tup[1]])
 
 
 def vecAngle(vec):

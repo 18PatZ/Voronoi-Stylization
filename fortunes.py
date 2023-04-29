@@ -10,7 +10,7 @@ EDGE_COLOR = (0, 128, 255)
 COMPLETE_COLOR = (0, 255, 255)
 SITE_COLOR = (0, 0, 0)
 
-ANIM_SPEED = 5000
+ANIM_SPEED = 50
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
@@ -26,17 +26,21 @@ def conv2d3d(vec2d):
     return np.array([vec2d[0], vec2d[1], 0])
 
 def drawText(img, position, text, color=(255,255,255), scale=1):
-    img = cv2.putText(img, text, arrToCvTup(np.array(position) + TEXT_OFFSET), 
-        cv2.FONT_HERSHEY_SIMPLEX, fontScale=scale, color=(0,0,0), lineType=cv2.LINE_AA, thickness=int(DRAW_THICKNESS/3 * 5))
 
-    img = cv2.putText(img, text, arrToCvTup(np.array(position) + TEXT_OFFSET), 
-        cv2.FONT_HERSHEY_SIMPLEX, fontScale=scale, color=color, lineType=cv2.LINE_AA, thickness=int(DRAW_THICKNESS/3))
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    t1 = int(DRAW_THICKNESS/3 * 5)
+    t2 = int(DRAW_THICKNESS/3)
+
+    s1, _ = cv2.getTextSize(text, font, fontScale=scale, thickness=t1)
+    s2, _ = cv2.getTextSize(text, font, fontScale=scale, thickness=t2)
+
+    img = cv2.putText(img, text, arrToCvTup(np.array(position) - npt(s2)/2 + TEXT_OFFSET), 
+        font, fontScale=scale, color=(0,0,0), lineType=cv2.LINE_AA, thickness=t1)
+
+    img = cv2.putText(img, text, arrToCvTup(np.array(position) - npt(s2)/2 + TEXT_OFFSET), 
+        font, fontScale=scale, color=color, lineType=cv2.LINE_AA, thickness=t2)
     return img
 
-def order2(a, b):
-    if a <= b:
-        return (a, b)
-    return (b, a)
 
 def resizeImgToScreen(img):
     
@@ -164,10 +168,10 @@ class Fortunes:
         if animate:
             if final_sweep_value is not None and final_sweep_value < last_sweep:
                 self.step_animation(final_sweep_value - ANIM_SPEED)
-            else:
-                self.step_animation(last_sweep - ANIM_SPEED)
-
+                cv2.waitKey(0)
             print("Animation complete.")
+
+            self.finish_animation()
             
             cv2.waitKey(0)
 
@@ -185,7 +189,7 @@ class Fortunes:
 
                 if intersection is not None: # edge starts outside, need to cut it 
                     edge.start = pt(intersection)
-                    edge.boundary = line
+                    edge.boundary_start = line
 
         for i in range(len(self.beachline.endpoints)):
             endpoint = self.beachline.endpoints[i]
@@ -203,21 +207,71 @@ class Fortunes:
                         final_sweep_value = intersection_sweep_value
 
                     edge.end = pt(intersection)
-                    edge.boundary = line
+                    edge.boundary_end = line
                     edge.ending_sweep = intersection_sweep_value
                     self.completed_edges.append(edge)
 
         return final_sweep_value
 
-    def makePolygons(self):
+    def connect_polygon_edges(self, id, edges):
+        i = 0
+        while i < len(edges):
+            next = i+1
+            if next >= len(edges):
+                next = 0
+            
+            edge = edges[i]
+            next_edge = edges[next]
+            
+            if edge.boundary_end is None and len(edges) > 1: # connecting unfinished edges
+                if np.linalg.norm(next_edge.start - edge.end) >= 1: # gap
+                    new_edge = Edge(edge.end, end=next_edge.start, site1_id=id, site2_id=id)
+                    edges.insert(i+1, new_edge)
+                    next_edge = new_edge
+
+            if edge.boundary_end is not None and np.linalg.norm(next_edge.start - edge.end) >= 1:
+                if next_edge.boundary_start is not None:
+                    diff = next_edge.start - edge.end
+                    boundary_line = edge.boundary_end[0]
+                    boundary = normalize(boundary_line[1])
+
+                    projection = np.dot(diff, boundary)
+                    if projection < 0: # facing wrong direction, we go to corner of image instead
+                        end = boundary_line[0] + boundary_line[1]
+                    else:
+                        end = edge.end + projection * boundary
+
+                    new_edge = Edge(edge.end, end=end, site1_id=id, site2_id=id)
+                    edges.insert(i+1, new_edge)
+
+                    # might be corner and need more
+                    new_edge.boundary_start = edge.boundary_end
+                    
+                    next_index = (edge.boundary_end[1] + 1) % len(self.bounding_box)
+                    next_line = self.bounding_box[next_index]
+                    new_edge.boundary_end = (next_line, next_index)
+                else:
+                    edges.insert(i+1, Edge(edge.end, end=next_edge.start, site1_id=id, site2_id=id))
+
+
+            i += 1
+
+    def makePolygons(self, check_unfinished=False, sweep=None):
 
         faces = {i: [] for i in range(len(self.sites))} # each face id corresponds to site
-        self.faces = {i: [] for i in range(len(self.sites))}
+        self.faces = {}
 
         for edge in self.completed_edges:
-            ids = order2(edge.site1_id, edge.site2_id)
-            faces[edge.site1_id].append((npa(edge.start), npa(edge.end), ids))
-            faces[edge.site2_id].append((npa(edge.start), npa(edge.end), ids))
+            faces[edge.site1_id].append(edge.np_copy())
+            faces[edge.site2_id].append(edge.np_copy())
+
+        if check_unfinished:
+            for endpoint in self.beachline.endpoints:
+                edge = endpoint.edge
+                if edge is not None:
+                    x, y = endpoint.calculateX(sweep, True)
+                    faces[edge.site1_id].append(edge.np_copy(end_value = np.array([x, y])))
+                    faces[edge.site2_id].append(edge.np_copy(end_value = np.array([x, y])))
 
         for id in faces:
             face_edges = faces[id]
@@ -229,129 +283,195 @@ class Fortunes:
             for i in range(len(face_edges)):
                 edge = face_edges[i]
           
-                sign = np.cross(conv2d3d(edge[0] - site), conv2d3d(edge[1] - edge[0]))[2]
+                sign = np.cross(conv2d3d(edge.start - site), conv2d3d(edge.end - edge.start))[2]
                 if sign < 0: # not counterclockwise, flip
-                    edge = (edge[1], edge[0], edge[2])
+                    edge.end, edge.start = edge.start, edge.end
+                    edge.boundary_start, edge.boundary_end = edge.boundary_end, edge.boundary_start
 
-                a = vecAngle(edge[0] - site)
+                a = vecAngle(edge.start - site)
                 face_edges[i] = (a, edge)
             
             face_edges.sort(key=lambda element: element[0])
+
+            refined_edges = []
             for i in range(len(face_edges)):
                 edge = face_edges[i][1]
-                ids = edge[2]
                 
-                if len(self.faces[id]) > 0:
-                    prev_edge = self.faces[id][-1]
-                    prev_edge_ids = prev_edge[2]
+                if len(refined_edges) > 0:
+                    prev_edge = refined_edges[-1]
                 
-                if np.linalg.norm(edge[1] - edge[0]) >= 0.1:
-                    if len(self.faces[id]) > 0 and ids[0] == prev_edge_ids[0] and ids[1] == prev_edge_ids[1]: # divides the same faces, they are both colinear, merge them
-                        prev = self.faces[id][-1]
-                        prev_new = (prev[0], edge[1], prev[2])
-                        self.faces[id][-1] = prev_new
+                if np.linalg.norm(edge.end - edge.start) >= 0.1:
+                    # if they divide the same faces, they are both colinear, merge them
+                    if len(refined_edges) > 0 and edge.same_ids(prev_edge): 
+                        refined_edges[-1].end = edge.end
+                        refined_edges[-1].boundary_end = edge.boundary_end
                     else:
-                        self.faces[id].append(edge)
+                        refined_edges.append(edge)
+            
+            if len(refined_edges) >= 2 and refined_edges[0].same_ids(refined_edges[-1]): # another merge check because its circular
+                refined_edges[-1].end = refined_edges[0].end
+                refined_edges[-1].boundary_end = refined_edges[0].boundary_end
+                del refined_edges[0]
+
+            self.connect_polygon_edges(id, refined_edges)
+
+            self.faces[id] = Face(site = flipY(self.sites[id]), id=id, edges=refined_edges)
 
 
+    def draw_animation_frame(self, y):
+        sweep = -y
+
+        img = np.copy(self.img)
+        
+        w = img.shape[1]
+        h = img.shape[0]
+
+        for i in range(len(self.sites)):
+            site = self.sites[i]
+            img = cv2.circle(img, center=arrToCvTup(site), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
+        
+        if DRAW_SWEEP:
+            img = cv2.line(img, (0, int(y)), (w-1, int(y)), color=(255, 255, 255), thickness=DRAW_THICKNESS)
+        
+        for i in range(len(self.beachline.endpoints)):
+            endpoint = self.beachline.endpoints[i]
+        
+            left, y = endpoint.calculateX(sweep, True)
+            right = w
+
+            if i < len(self.beachline.endpoints)-1:
+                right = self.beachline.endpoints[i+1].calculateX(sweep)
+
+            if endpoint.right_arc is not None:
+                drawArc(img, endpoint.right_arc, sweep, left, right)
+
+            if endpoint.edge is not None:
+                start = npa(endpoint.edge.start)
+                
+                current_end = np.array([left, y]) # current intersection
+                
+                start, end = vectorPortionInRegion(start, current_end, self.bounding_box)
+                if start is not None and end is not None:
+                    img = cv2.line(img, (int(start[0]), int(-start[1])), (int(current_end[0]), int(-current_end[1])), color=EDGE_COLOR, thickness=DRAW_THICKNESS)
+
+        for edge in self.completed_edges:
+            start = npa(edge.start)
+            end = npa(edge.end)
+            if edge.ending_sweep >= sweep:
+                s = np.array([start[0], -start[1]])
+                e = np.array([end[0], -end[1]])
+                img = cv2.line(img, arrToCvTup(s), arrToCvTup(e), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
+
+        to_remove = []
+        for circle in self.circles:
+            (intersection, dist_to_focus, intersection_sweep_value) = circle
+            img = cv2.circle(img, center=(int(intersection[0]), int(-intersection[1])), radius=int(dist_to_focus), color=(255, 0, 0), thickness=DRAW_THICKNESS)
+            img = cv2.line(img, (0, int(-intersection_sweep_value)), (w-1, int(-intersection_sweep_value)), color=(255, 0, 0), thickness=DRAW_THICKNESS)
+
+            if sweep <= intersection_sweep_value:
+                to_remove.append(circle)
+        for circle in to_remove:
+            self.circles.remove(circle)
+
+
+        for i in range(len(self.sites)):
+            site = self.sites[i]
+            img = drawText(img, site, "S"+str(i), scale=1)
+        
+        for edge in self.completed_edges:
+            start = npa(edge.start)
+            end = npa(edge.end)
+            if edge.ending_sweep >= sweep:
+                s = np.array([start[0], -start[1]])
+                e = np.array([end[0], -end[1]])
+                img = drawText(img, (s+e)/2, f"E{edge.site1_id},{edge.site2_id}", scale=0.8)
+
+        for id in self.faces:
+            face = self.faces[id]
+            edges = face.edges
+            
+            for i in range(len(edges)):
+                edge = edges[i]
+                point = edge.start + normalize(flipY(face.centroid) - edge.start) * 50
+
+                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(point)), color=(255,0,0), thickness=2)
+                img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(edge.end)), color=(128,128,0), thickness=2)
+                
+                img = drawText(img, (point[0], -point[1]), f"S{id}V{i}", scale=0.5)
+
+                img = cv2.circle(img, center=arrToCvTup(flipY(edge.start)), radius=10, color=(0, 255, 0), thickness=-1)
+                img = cv2.circle(img, center=arrToCvTup(flipY(edge.end)), radius=10, color=(255, 255, 0), thickness=-1)
+
+        return img
+    
+
+    def final_animation_frame(self):
+        img = np.copy(self.img)
+        
+        w = img.shape[1]
+        h = img.shape[0]
+
+        for i in range(len(self.sites)):
+            site = self.sites[i]
+            img = cv2.circle(img, center=arrToCvTup(site), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
+
+        text = []
+        
+        for i in range(len(self.sites)):
+            site = self.sites[i]
+            text.append((site, "S"+str(i), 1))
+        
+        for id in self.faces:
+            face = self.faces[id]
+            edges = face.edges
+            
+            for i in range(len(edges)):
+                edge = edges[i]
+                nudge = 50
+                point = edge.start + normalize(face.centroid - edge.start) * nudge
+                
+                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
+
+                edge_center = (edge.start+edge.end)/2
+                edge_center += normalize(face.centroid - edge_center) * nudge
+
+                img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
+                
+                text.append((flipY(point), f"S{id}V{i}", 0.5))
+                text.append((flipY(edge_center), f"S{id}E{edge.site1_id}", 0.8))
+
+                text.append((flipY(face.centroid), f"S{id}C", 0.5))
+
+        for t in text:
+            drawText(img, position=t[0], text=t[1], scale=t[2])
+            
+        return img
 
 
     def step_animation(self, target_sweep):
         
-        w = self.img.shape[1]
-        h = self.img.shape[0]
-
         for y in range(int(self.lastY), -int(target_sweep), ANIM_SPEED):
-            sweep = -y
-
-            img = np.copy(self.img)
-
-            for i in range(len(self.sites)):
-                site = self.sites[i]
-                img = cv2.circle(img, center=arrToCvTup(site), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
-            
-            if DRAW_SWEEP:
-                img = cv2.line(img, (0, int(y)), (w-1, int(y)), color=(255, 255, 255), thickness=DRAW_THICKNESS)
-            
-            for i in range(len(self.beachline.endpoints)):
-                endpoint = self.beachline.endpoints[i]
-            
-                left, y = endpoint.calculateX(sweep, True)
-                right = w
-
-                if i < len(self.beachline.endpoints)-1:
-                    right = self.beachline.endpoints[i+1].calculateX(sweep)
-
-                if endpoint.right_arc is not None:
-                    drawArc(img, endpoint.right_arc, sweep, left, right)
-
-                if endpoint.edge is not None:
-                    start = npa(endpoint.edge.start)
-                    
-                    current_end = np.array([left, y]) # current intersection
-                    
-                    start, end = vectorPortionInRegion(start, current_end, self.bounding_box)
-                    if start is not None and end is not None:
-                        img = cv2.line(img, (int(start[0]), int(-start[1])), (int(current_end[0]), int(-current_end[1])), color=EDGE_COLOR, thickness=DRAW_THICKNESS)
-
-            for edge in self.completed_edges:
-                start = npa(edge.start)
-                end = npa(edge.end)
-                if edge.ending_sweep >= sweep:
-                    s = np.array([start[0], -start[1]])
-                    e = np.array([end[0], -end[1]])
-                    img = cv2.line(img, arrToCvTup(s), arrToCvTup(e), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
-
-            to_remove = []
-            for circle in self.circles:
-                (intersection, dist_to_focus, intersection_sweep_value) = circle
-                img = cv2.circle(img, center=(int(intersection[0]), int(-intersection[1])), radius=int(dist_to_focus), color=(255, 0, 0), thickness=DRAW_THICKNESS)
-                img = cv2.line(img, (0, int(-intersection_sweep_value)), (w-1, int(-intersection_sweep_value)), color=(255, 0, 0), thickness=DRAW_THICKNESS)
-
-                if sweep <= intersection_sweep_value:
-                    to_remove.append(circle)
-            for circle in to_remove:
-                self.circles.remove(circle)
-
-
-            for i in range(len(self.sites)):
-                site = self.sites[i]
-                img = drawText(img, site, "S"+str(i), scale=1)
-            
-            for edge in self.completed_edges:
-                start = npa(edge.start)
-                end = npa(edge.end)
-                if edge.ending_sweep >= sweep:
-                    s = np.array([start[0], -start[1]])
-                    e = np.array([end[0], -end[1]])
-                    img = drawText(img, (s+e)/2, f"E{edge.site1_id},{edge.site2_id}", scale=0.8)
-
-            for id in self.faces:
-                site = self.sites[id]
-                edges = self.faces[id]
-                
-                for i in range(len(edges)):
-                    edge = edges[i]
-                    point = edge[0] + normalize(flipY(site) - edge[0]) * 50
-                    img = cv2.line(img, arrToCvTup(flipY(edge[0])), arrToCvTup(flipY(point)), color=(255,0,0), thickness=2)
-                    img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(edge[1])), color=(128,128,0), thickness=2)
-                    img = drawText(img, (point[0], -point[1]), f"S{id}V{i}", scale=0.5)
-
-            
             # cv2.namedWindow("Fortune's Algorithm", cv2.WINDOW_NORMAL)
             # img = resizeImgToScreen(img) 
-            cv2.imshow("Fortune's Algorithm", img)
+            cv2.imshow("Fortune's Algorithm", self.draw_animation_frame(y))
 
             # print(sweep, target_sweep)
             
             key = cv2.waitKey(1)
+            if key & 0xFF == ord(' '):
+                key = cv2.waitKey(0)
+            if key & 0xFF == ord('p'):
+                self.makePolygons(check_unfinished=True, sweep=target_sweep)
+                cv2.imshow("Fortune's Algorithm", self.draw_animation_frame(y))
+                key = cv2.waitKey(0)
             if key & 0xFF == ord('q'):
                 exit()
-            elif key & 0xFF == ord(' '):
-                cv2.waitKey(0)
 
         self.lastY = -target_sweep + 1
         
+
+    def finish_animation(self):
+        cv2.imshow("Fortune's Algorithm", self.final_animation_frame())
 
 
 

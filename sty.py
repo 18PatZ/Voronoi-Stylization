@@ -19,7 +19,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 5
+n = 2
 
 # def trunc(p1, p2, line):
 #     # v1 = np.array([tup[0], tup[1]])
@@ -160,7 +160,7 @@ def arrToCvTup(a):
 #         sample_points.append([x, y])
 for i in range(0, n**2):
     sample_points.append([random.random() * width, random.random() * height])
-    sample_points.append([random.random() * width, 200])
+    # sample_points.append([random.random() * width, 200])
 
 # sample_points = [
 #     [200, 200],
