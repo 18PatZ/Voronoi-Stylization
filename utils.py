@@ -192,8 +192,8 @@ def rayIntersectLineSegment(origin, direction, line):
     return u, v, point
 
 
-def edgeIntersectBoundingBox(edge, bounding_box):
-    return rayIntersectBoundingBox(npa(edge.start), edge.vec, bounding_box)
+def edgeIntersectBoundingBox(edge, bounding_box, only_closest=False, max_ray_length=None):
+    return rayIntersectBoundingBox(npa(edge.start), edge.vec, bounding_box, only_closest, max_ray_length)
 
 def rayIntersectBoundingBox(origin, direction, bounding_box, only_closest=False, max_ray_length=None):
 
@@ -243,13 +243,25 @@ def get_image_bounding_box(img):
     # /\    ||
     # ||    \/
     # ||<=====
+    # return [
+    #     (tl, tr-tl),
+    #     (tr, br-tr),
+    #     (br, bl-br),
+    #     (bl, tl-bl),
+    # ]
 
+    # we want counterclockwise actually
+    # ||<=====
+    # ||    /\
+    # \/    ||
+    # =====>||
     return [
-        (tl, tr-tl),
-        (tr, br-tr),
-        (br, bl-br),
-        (bl, tl-bl),
+        (tl, bl-tl),
+        (bl, br-bl),
+        (br, tr-br),
+        (tr, tl-tr),
     ]
+    
 
 
 
@@ -486,12 +498,33 @@ def npa(pt):
     return np.array([pt.x, pt.y])
 
 
+def vecAngle(vec):
+    v = normalize(vec)
+    c = np.array([1, 0])
+    # c = normalize(compare)
+
+    dot = np.dot(v, c) # dot
+    det = v[0] * c[1] - c[0] * v[1]      # determinant
+    angle = math.atan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
+    
+    angle = -angle * 180 / math.pi
+    # if angle < 0:
+    #     angle += 360
+
+    return angle
+
+
 if __name__ == '__main__':
     test_array = [(1,2),(3,4),(5.2,6),(5.2,7000),(5.3,8),(9,10)]
     # test_array = []
     k = KeyList(test_array, key=lambda x: x[0])
     print(bisect.bisect_right(k, 9))
 
+    # print(vecAngle(np.array([1, 0]), np.array([1, 0])))
+    # print(vecAngle(np.array([1, 1]), np.array([1, 0])))
+    # print(vecAngle(np.array([-1, 1]), np.array([1, 0])))
+    # print(vecAngle(np.array([-1, -1]), np.array([1, 0])))
+    # print(vecAngle(np.array([1, -1]), np.array([1, 0])))
 
     # test_array.append((2,0))
     # print(bisect.bisect_right(k, 6))

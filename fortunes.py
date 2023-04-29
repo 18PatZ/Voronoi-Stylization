@@ -7,10 +7,10 @@ from utils import *
 
 ARC_COLOR = (0,0,255)#(0, 128, 255)
 EDGE_COLOR = (0, 128, 255)
-COMPLETE_COLOR = EDGE_COLOR#(0, 255, 255)
+COMPLETE_COLOR = (0, 255, 255)
 SITE_COLOR = (0, 0, 0)
 
-ANIM_SPEED = 10
+ANIM_SPEED = 5000
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
@@ -19,6 +19,11 @@ TEXT_OFFSET = np.array([10, 10])
 def arrToCvTup(a):
     return (int(a[0]), int(a[1]))
 
+def flipY(pt):
+    return np.array([pt[0], -pt[1]])
+
+def conv2d3d(vec2d):
+    return np.array([vec2d[0], vec2d[1], 0])
 
 def drawText(img, position, text, color=(255,255,255), scale=1):
     img = cv2.putText(img, text, arrToCvTup(np.array(position) + TEXT_OFFSET), 
@@ -27,6 +32,11 @@ def drawText(img, position, text, color=(255,255,255), scale=1):
     img = cv2.putText(img, text, arrToCvTup(np.array(position) + TEXT_OFFSET), 
         cv2.FONT_HERSHEY_SIMPLEX, fontScale=scale, color=color, lineType=cv2.LINE_AA, thickness=int(DRAW_THICKNESS/3))
     return img
+
+def order2(a, b):
+    if a <= b:
+        return (a, b)
+    return (b, a)
 
 def resizeImgToScreen(img):
     
@@ -43,6 +53,10 @@ def resizeImgToScreen(img):
         img = cv2.resize(img, arrToCvTup(new_dim))
     
     return img
+
+def cosWithHorizontal(vec):
+        dot = normalize(vec)[0] # dot with (1, 0) is just x component
+        return dot # for sorting by angle, we just need cos(angle), since cos is monotonic from 0 to pi
 
 
 def vectorPortionInRegion(start, end, bounding_box):    
@@ -109,6 +123,8 @@ class Fortunes:
         self.img = np.copy(img)
 
         self.bounding_box = get_image_bounding_box(self.img)
+
+        self.faces = {}
         
         self.skip_events_outside_img = skip_events_outside_img
         self.min_intersection_y = -self.img.shape[0] # don't wait for circle events if they're outside of the image
@@ -143,9 +159,13 @@ class Fortunes:
         last_sweep = -self.lastY
         final_sweep_value = self.finish_edges(self.bounding_box)
 
+        self.makePolygons()
+        
         if animate:
             if final_sweep_value is not None and final_sweep_value < last_sweep:
                 self.step_animation(final_sweep_value - ANIM_SPEED)
+            else:
+                self.step_animation(last_sweep - ANIM_SPEED)
 
             print("Animation complete.")
             
@@ -161,7 +181,7 @@ class Fortunes:
 
         for edge in self.completed_edges:
             if not isPointInPolygon(edge.start, bounding_box):
-                intersection, line = edgeIntersectBoundingBox(edge, bounding_box)
+                intersection, line = edgeIntersectBoundingBox(edge, bounding_box, max_ray_length=np.linalg.norm(npa(edge.end) - npa(edge.start)))
 
                 if intersection is not None: # edge starts outside, need to cut it 
                     edge.start = pt(intersection)
@@ -189,8 +209,50 @@ class Fortunes:
 
         return final_sweep_value
 
+    def makePolygons(self):
 
-    # def makePolygons():
+        faces = {i: [] for i in range(len(self.sites))} # each face id corresponds to site
+        self.faces = {i: [] for i in range(len(self.sites))}
+
+        for edge in self.completed_edges:
+            ids = order2(edge.site1_id, edge.site2_id)
+            faces[edge.site1_id].append((npa(edge.start), npa(edge.end), ids))
+            faces[edge.site2_id].append((npa(edge.start), npa(edge.end), ids))
+
+        for id in faces:
+            face_edges = faces[id]
+            if len(face_edges) == 0:
+                continue
+
+            site = flipY(self.sites[id])
+
+            for i in range(len(face_edges)):
+                edge = face_edges[i]
+          
+                sign = np.cross(conv2d3d(edge[0] - site), conv2d3d(edge[1] - edge[0]))[2]
+                if sign < 0: # not counterclockwise, flip
+                    edge = (edge[1], edge[0], edge[2])
+
+                a = vecAngle(edge[0] - site)
+                face_edges[i] = (a, edge)
+            
+            face_edges.sort(key=lambda element: element[0])
+            for i in range(len(face_edges)):
+                edge = face_edges[i][1]
+                ids = edge[2]
+                
+                if len(self.faces[id]) > 0:
+                    prev_edge = self.faces[id][-1]
+                    prev_edge_ids = prev_edge[2]
+                
+                if np.linalg.norm(edge[1] - edge[0]) >= 0.1:
+                    if len(self.faces[id]) > 0 and ids[0] == prev_edge_ids[0] and ids[1] == prev_edge_ids[1]: # divides the same faces, they are both colinear, merge them
+                        prev = self.faces[id][-1]
+                        prev_new = (prev[0], edge[1], prev[2])
+                        self.faces[id][-1] = prev_new
+                    else:
+                        self.faces[id].append(edge)
+
 
 
 
@@ -263,6 +325,17 @@ class Fortunes:
                     s = np.array([start[0], -start[1]])
                     e = np.array([end[0], -end[1]])
                     img = drawText(img, (s+e)/2, f"E{edge.site1_id},{edge.site2_id}", scale=0.8)
+
+            for id in self.faces:
+                site = self.sites[id]
+                edges = self.faces[id]
+                
+                for i in range(len(edges)):
+                    edge = edges[i]
+                    point = edge[0] + normalize(flipY(site) - edge[0]) * 50
+                    img = cv2.line(img, arrToCvTup(flipY(edge[0])), arrToCvTup(flipY(point)), color=(255,0,0), thickness=2)
+                    img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(edge[1])), color=(128,128,0), thickness=2)
+                    img = drawText(img, (point[0], -point[1]), f"S{id}V{i}", scale=0.5)
 
             
             # cv2.namedWindow("Fortune's Algorithm", cv2.WINDOW_NORMAL)
