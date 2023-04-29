@@ -21,7 +21,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 3
+n = 500
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -90,7 +90,10 @@ cv2.imshow('SciPy Stylized', sStylized)
 
 start = time.time()
 vp = Fortunes(sites=sites_flipped, img=fImg)
-vp.process(animate=False, draw=True)
+vp.process(animate=False)
+print("Fortune's done in ", time.time()-start)
+
+
 
 faces = vp.get_faces()
 for face_id in faces:
@@ -100,12 +103,8 @@ for face_id in faces:
 
 # cv2.imshow('image2',img2)
 cv2.imshow("Fortune's Stylized", fStylized)
-
-
-
-print("Fortune's done in ", time.time()-start)
-
-
+# cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=True, labelCentroids=False))
+cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=False, labelSites=False, labelCentroids=False, fontscale=0.5, thickness=1))
 
 
 
@@ -114,10 +113,14 @@ print("Fortune's done in ", time.time()-start)
 spl = filepath.split(".")
 filename = spl[0]
 extension = spl[1]
-cv2.imwrite(f'output/{filename}-{n}-voronoi.{extension}', img)
-# cv2.imwrite(f'output/{filename}-{n}-stylized.{extension}', stylized)
 
+cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
+cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
 
+cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylized.{extension}', fStylized)
+
+cv2.waitKey(0)
 
 #print(vor.ridge_points)
 #print(vor.ridge_vertices)

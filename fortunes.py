@@ -100,7 +100,7 @@ class Fortunes:
                 type = "SITE") 
 
 
-    def process(self, animate=True, draw=True):
+    def process(self, animate=True):
         while not self.events.empty():
             value, event, type = self.events.pop()
             
@@ -123,9 +123,8 @@ class Fortunes:
                 self.step_animation(final_sweep_value - ANIM_SPEED)
                 cv2.waitKey(0)
             print("Animation complete.")
-
-        if draw:
-            self.finish_animation()
+            
+            cv2.imshow("Fortune's Algorithm", self.draw())
             cv2.waitKey(0)
 
     
@@ -366,7 +365,7 @@ class Fortunes:
         return img
     
 
-    def final_animation_frame(self):
+    def draw(self, labelEdges=True, labelVertices=True, labelSites=True, labelCentroids=True, fontscale=1, thickness=DRAW_THICKNESS):
         img = np.copy(self.img)
         
         w = img.shape[1]
@@ -378,9 +377,10 @@ class Fortunes:
 
         text = []
         
-        for i in range(len(self.sites)):
-            site = self.sites[i]
-            text.append((flipY(site), "S"+str(i), 1))
+        if labelSites:
+            for i in range(len(self.sites)):
+                site = self.sites[i]
+                text.append((flipY(site), "S"+str(i), fontscale))
         
         for id in self.faces:
             face = self.faces[id]
@@ -391,17 +391,22 @@ class Fortunes:
                 nudge = 50
                 point = edge.start + normalize(face.centroid - edge.start) * nudge
                 
-                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
+                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=thickness)
 
                 edge_center = (edge.start+edge.end)/2
                 edge_center += normalize(face.centroid - edge_center) * nudge
 
-                img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
+                # img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
+                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
                 
-                text.append((flipY(point), f"S{id}V{i}", 0.5))
-                text.append((flipY(edge_center), f"S{id}E{i}", 0.8))
+                if labelVertices:
+                    text.append((flipY(point), f"S{id}V{i}", 0.5 * fontscale))
 
-                text.append((flipY(face.centroid), f"S{id}C", 0.5))
+                if labelEdges:
+                    text.append((flipY(edge_center), f"S{id}E{i}", 0.8 * fontscale))
+
+                if labelCentroids:
+                    text.append((flipY(face.centroid), f"S{id}C", 0.5 * fontscale))
 
         for t in text:
             drawText(img, position=t[0], text=t[1], scale=t[2])
@@ -430,10 +435,6 @@ class Fortunes:
 
         self.lastY = -target_sweep + 1
         
-
-    def finish_animation(self):
-        cv2.imshow("Fortune's Algorithm", self.final_animation_frame())
-
 
 
     def handle_site_event(self, event):
