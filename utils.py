@@ -113,13 +113,21 @@ class Edge:
     def __str__(self):
         return f"<S {self.start} | V {self.vec}>"
 
-    def np_copy(self, end_value=None):
-        clone = Edge(start=npa(self.start), vec=self.vec, site1_id=self.site1_id, site2_id=self.site2_id)
+    def copy(self, end_value=None):
+        clone = Edge(start=self.start, vec=self.vec, site1_id=self.site1_id, site2_id=self.site2_id)
         clone.site_ids = self.site_ids
-        clone.end = npa(self.end) if self.end is not None else end_value
+        clone.end = self.end if self.end is not None else end_value
         clone.boundary_start = self.boundary_start
         clone.boundary_end = self.boundary_end
         clone.ending_sweep = clone.ending_sweep
+        return clone
+
+    def np_copy(self, end_value=None):
+        clone = self.copy(end_value)
+        if self.start is not None:
+            clone.start = npa(self.start)
+        if self.end is not None:
+            clone.end = npa(self.end)
         return clone
 
     def same_ids(self, other_edge):
@@ -584,12 +592,13 @@ def vectorPortionInRegion(start, end, bounding_box):
 
     displacement = end-start
     
-    intersection, _ = rayIntersectBoundingBox(start, displacement, bounding_box, only_closest=True, max_ray_length=1)
-    if intersection is None:
-        return None, None
 
     if not start_inside:
-        start = intersection
+        intersection, _ = rayIntersectBoundingBox(start, displacement, bounding_box, only_closest=True, max_ray_length=1)
+        if intersection is None:
+            return None, None
+
+            start = intersection
     if not end_inside:
         nudged_start = start + normalize(displacement) * 0.01 # since start already intersects box, needs a little nudge
         intersection, _ = rayIntersectBoundingBox(nudged_start, displacement, bounding_box, only_closest=True, max_ray_length=1)
@@ -604,6 +613,8 @@ if __name__ == '__main__':
     # test_array = []
     k = KeyList(test_array, key=lambda x: x[0])
     print(bisect.bisect_right(k, 9))
+
+    print(rayIntersectLineSegment(np.array([10, 0]), np.array([0, -10]), (np.array([100, 0]), np.array([-100, 0]))))
 
     # print(vecAngle(np.array([1, 0]), np.array([1, 0])))
     # print(vecAngle(np.array([1, 1]), np.array([1, 0])))

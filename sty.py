@@ -9,6 +9,8 @@ from scipyVoronoi import *
 from Voronoi import Voronoi as Vr
 from fortunes import Fortunes
 
+from stylizeUtils import *
+
 filepath = "titanfall2.png"
 img = cv2.imread(f"input/{filepath}")
 
@@ -19,7 +21,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 2
+n = 3
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -68,6 +70,8 @@ fStylized = img.copy()
 
 drawScipyFaces(sStylized, sFaces)
 
+
+
 # for line in lines_2:
 #     p1 = line[0]
 #     p2 = line[1]
@@ -83,12 +87,21 @@ drawScipyFaces(sStylized, sFaces)
 
 cv2.imshow('SciPy Voronoi', sImg)
 cv2.imshow('SciPy Stylized', sStylized)
-# cv2.imshow('image2',img2)
-# cv2.imshow('stylized', stylized)
 
 start = time.time()
 vp = Fortunes(sites=sites_flipped, img=fImg)
-vp.process(animate=True)
+vp.process(animate=False, draw=True)
+
+faces = vp.get_faces()
+for face_id in faces:
+    face = faces[face_id]
+    polygon = [flipY(edge.start) for edge in face.edges]
+    fStylized = averagePolygon(fStylized, polygon)
+
+# cv2.imshow('image2',img2)
+cv2.imshow("Fortune's Stylized", fStylized)
+
+
 
 print("Fortune's done in ", time.time()-start)
 

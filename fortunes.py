@@ -10,7 +10,7 @@ EDGE_COLOR = (0, 128, 255)
 COMPLETE_COLOR = (0, 255, 255)
 SITE_COLOR = (0, 0, 0)
 
-ANIM_SPEED = 10
+ANIM_SPEED = 30
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
@@ -100,7 +100,7 @@ class Fortunes:
                 type = "SITE") 
 
 
-    def process(self, animate=True):
+    def process(self, animate=True, draw=True):
         while not self.events.empty():
             value, event, type = self.events.pop()
             
@@ -124,8 +124,8 @@ class Fortunes:
                 cv2.waitKey(0)
             print("Animation complete.")
 
+        if draw:
             self.finish_animation()
-            
             cv2.waitKey(0)
 
     
@@ -215,8 +215,16 @@ class Fortunes:
         self.faces = {}
 
         for edge in self.completed_edges:
-            faces[edge.site1_id].append(edge.np_copy())
-            faces[edge.site2_id].append(edge.np_copy())
+            edge_copy = edge.np_copy()
+            if not isPointInPolygon(edge.start, self.bounding_box) or not isPointInPolygon(edge.end, self.bounding_box):
+                new_start, new_end = vectorPortionInRegion(edge_copy.start, edge_copy.end, self.bounding_box)
+                if new_start is None or new_end is None: # this edge isn't even in region, skip
+                    continue
+                edge_copy.start = new_start
+                edge_copy.end = new_end
+
+            faces[edge.site1_id].append(edge_copy)
+            faces[edge.site2_id].append(edge_copy.copy())
 
         if check_unfinished:
             for endpoint in self.beachline.endpoints:
@@ -240,7 +248,7 @@ class Fortunes:
                 if sign < 0: # not counterclockwise, flip
                     edge.end, edge.start = edge.start, edge.end
                     edge.boundary_start, edge.boundary_end = edge.boundary_end, edge.boundary_start
-
+                    
                 a = vecAngle(edge.start - site)
                 face_edges[i] = (a, edge)
             
@@ -372,7 +380,7 @@ class Fortunes:
         
         for i in range(len(self.sites)):
             site = self.sites[i]
-            text.append((site, "S"+str(i), 1))
+            text.append((flipY(site), "S"+str(i), 1))
         
         for id in self.faces:
             face = self.faces[id]
@@ -391,7 +399,7 @@ class Fortunes:
                 img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
                 
                 text.append((flipY(point), f"S{id}V{i}", 0.5))
-                text.append((flipY(edge_center), f"S{id}E{edge.site1_id}", 0.8))
+                text.append((flipY(edge_center), f"S{id}E{i}", 0.8))
 
                 text.append((flipY(face.centroid), f"S{id}C", 0.5))
 

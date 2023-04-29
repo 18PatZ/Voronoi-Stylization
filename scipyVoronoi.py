@@ -3,6 +3,7 @@ import numpy as np
 from utils import *
 
 import time
+from stylizeUtils import *
 
 import cv2
 
@@ -157,16 +158,8 @@ def drawScipyPoints(img, sample_points):
     return img
 
 def drawScipyFaces(img, sFaces):
-    channels = img.shape[2]
     for polygon in sFaces:
-        mask = np.zeros(img.shape[:2], dtype=np.uint8)
-        roi_corners = np.array([[arrToCvTup(p) for p in polygon]], dtype=np.int32)#np.array([[(10,10), (300,300), (10,300)]], dtype=np.int32)
-        # fill the ROI so it doesn't get wiped out when the mask is applied
-        ignore_mask_color = (255,) * channels
-        cv2.fillPoly(mask, roi_corners, ignore_mask_color)
-
-        avg = cv2.mean(img, mask)
-        cv2.fillPoly(img, roi_corners, avg)
+        img = averagePolygon(img, polygon)
     return img
 
     # masked_image = cv2.bitwise_and(img, mask)
