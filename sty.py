@@ -21,7 +21,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 500
+n = 3
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -58,15 +58,19 @@ print("SciPy done in ", time.time()-start)
 # fImg = np.copy(img)
 sImg = np.copy(img)
 
+fImg = np.copy(sImg)
+fImgD = np.copy(sImg)
+
 drawScipyLines(sImg, sLines)
 
-fImg = np.copy(sImg)
+fImgL = np.copy(sImg)
 
 # drawScipyPoints(img, sites)
 
 
 sStylized = img.copy()
 fStylized = img.copy()
+fStylizedD = img.copy()
 
 drawScipyFaces(sStylized, sFaces)
 
@@ -89,22 +93,54 @@ cv2.imshow('SciPy Voronoi', sImg)
 cv2.imshow('SciPy Stylized', sStylized)
 
 start = time.time()
-vp = Fortunes(sites=sites_flipped, img=fImg)
+vp = Fortunes(sites=sites_flipped, img=fImgL)
 vp.process(animate=False)
 print("Fortune's done in ", time.time()-start)
 
-
-
 faces = vp.get_faces()
+face_colors = {}
 for face_id in faces:
     face = faces[face_id]
-    polygon = [flipY(edge.start) for edge in face.edges]
-    fStylized = averagePolygon(fStylized, polygon)
+    # polygon = [flipY(edge.start) for edge in face.edges]
+    polygon = []
+
+    for edge in face.edges:
+        fImg = cv2.line(fImg, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
+        fImgD = cv2.line(fImgD, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
+
+        polygon.append(flipY(edge.start))
+    
+    fStylized, avg = averagePolygon(fStylized, polygon)
+    face_colors[face_id] = np.array(avg)
+
+# fStylizedD = np.copy(fStylized)
+
+# for i in range(100):
+#     new_point = [random.random() * width, random.random() * height]
+#     face = vp.get_closest_face(new_point)
+#     if face is not None:
+#         tup = arrToCvTup(new_point)
+#         fStylized[tup[1]][tup[0]] = img[tup[1]][tup[0]]
+
+for face_id in faces:
+    polygon = []
+    for tri in vp.triangles[face_id]:
+        for i in range(len(tri.vertices)):
+            fImgD = cv2.line(fImgD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,255), thickness=1)
+            # fStylizedD = cv2.line(fStylizedD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,0), thickness=1)
+#             polygon.append(flipY(tri.vertices[i]))
+#     fStylizedD, avg = averagePolygon(fStylizedD, polygon)
+gourad(fStylizedD, vp.triangles, face_colors)
 
 # cv2.imshow('image2',img2)
-cv2.imshow("Fortune's Stylized", fStylized)
+cv2.imshow("Fortune's Voronoi", fImg)
+cv2.imshow("Fortune's Stylized Voronoi", fStylized)
+cv2.imshow("Fortune's Delaunay", fImgD)
+cv2.imshow("Fortune's Stylized Delaunay", fStylizedD)
+cv2.imshow("Fortune's Algorithm", vp.draw())
+# cv2.imshow("Fortune's Algorithm - Delaunay", vp.draw(drawEdges=False, labelSites=False, thickness=1))
 # cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=True, labelCentroids=False))
-cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=False, labelSites=False, labelCentroids=False, fontscale=0.5, thickness=1))
+# cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=False, labelSites=False, labelCentroids=False, fontscale=0.5, thickness=1))
 
 
 
@@ -118,7 +154,9 @@ cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
 cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
 
 cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylized.{extension}', fStylized)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-delaunay.{extension}', fImgD)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedV.{extension}', fStylized)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedD.{extension}', fStylizedD)
 
 cv2.waitKey(0)
 

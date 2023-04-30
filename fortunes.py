@@ -82,6 +82,7 @@ class Fortunes:
         self.bounding_box = get_image_bounding_box(self.img)
 
         self.faces = {}
+        self.triangles = {}
         
         self.skip_events_outside_img = skip_events_outside_img
         self.min_intersection_y = -self.img.shape[0] # don't wait for circle events if they're outside of the image
@@ -117,6 +118,7 @@ class Fortunes:
         final_sweep_value = self.finish_edges(self.bounding_box)
 
         self.makePolygons()
+        self.triangulate()
         
         if animate:
             if final_sweep_value is not None and final_sweep_value < last_sweep:
@@ -124,7 +126,8 @@ class Fortunes:
                 cv2.waitKey(0)
             print("Animation complete.")
             
-            cv2.imshow("Fortune's Algorithm", self.draw())
+            cv2.imshow("Fortune's Algorithm", self.draw(drawTris=False))
+            cv2.imshow("Fortune's Algorithm - Delaunay", self.draw(drawEdges=False, drawTris=True))
             cv2.waitKey(0)
 
     
@@ -285,6 +288,63 @@ class Fortunes:
 
             self.faces[id] = Face(site = self.sites[id], id=id, edges=refined_edges)
 
+    
+    def triangulate(self):
+        self.triangles = {}
+
+        outer_faces = []
+
+        for id in self.faces:
+            face = self.faces[id]
+
+            tris = []
+            has_boundary = False
+            
+            if len(face.edges) > 1:
+                for i in range(len(face.edges)):
+                    edge = face.edges[i]
+                    next_edge = face.edges[(i+1) % len(face.edges)]
+
+                    if edge.site1_id != edge.site2_id and next_edge.site1_id != next_edge.site2_id: # find edge that bisects two sites
+                        other1 = edge.site1_id if edge.site1_id != id else edge.site2_id
+                        other2 = next_edge.site1_id if next_edge.site1_id != id else next_edge.site2_id
+
+                        tris.append(Triangle(sites=[id, other1, other2], vertices=[self.sites[id], self.sites[other1], self.sites[other2]]))
+                    else:
+                        if edge.boundary_start is not None and edge.boundary_end is not None:
+                            has_boundary = True
+                        
+                            # we prolly making some duplicates here
+
+                            prev_edge = face.edges[i-1]
+                            
+                            id2 = id
+                            if prev_edge.site1_id != prev_edge.site2_id:
+                                other = prev_edge.site1_id if prev_edge.site1_id != id else prev_edge.site2_id
+                                id2 = (id, other)
+                                tris.append(Triangle(sites=[id, other, id2], vertices=[self.sites[id], self.sites[other], edge.start], inner=False))
+                            
+                            id3 = id
+                            if next_edge.site1_id != next_edge.site2_id:
+                                other = next_edge.site1_id if next_edge.site1_id != id else next_edge.site2_id
+                                id3 = (id, other)
+                                tris.append(Triangle(sites=[id, id3, other], vertices=[self.sites[id], next_edge.start, self.sites[other]], inner=False))
+                            
+                            tris.append(Triangle(sites=[id, id2, id3], vertices=[self.sites[id], edge.start, edge.end], inner=False))
+
+
+            
+            self.triangles[id] = tris
+
+            if has_boundary:
+                outer_faces.append(id)
+
+        # print("Outer:", outer_faces)
+
+                    
+
+
+
 
     def draw_animation_frame(self, y):
         sweep = -y
@@ -373,7 +433,7 @@ class Fortunes:
         return img
     
 
-    def draw(self, labelEdges=True, labelVertices=True, labelSites=True, labelCentroids=True, fontscale=1, thickness=DRAW_THICKNESS):
+    def draw(self, labelEdges=True, labelVertices=True, labelSites=True, labelCentroids=True, drawEdges=True, drawTris=True, fontscale=1, thickness=DRAW_THICKNESS):
         img = np.copy(self.img)
         
         w = img.shape[1]
@@ -394,27 +454,36 @@ class Fortunes:
             face = self.faces[id]
             edges = face.edges
             
-            for i in range(len(edges)):
-                edge = edges[i]
-                nudge = 50
-                point = edge.start + normalize(face.centroid - edge.start) * nudge
-                
-                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=thickness)
+            if drawEdges:
+                for i in range(len(edges)):
+                    edge = edges[i]
+                    nudge = 50
+                    point = edge.start + normalize(face.centroid - edge.start) * nudge
+                    
+                    img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
 
-                edge_center = (edge.start+edge.end)/2
-                edge_center += normalize(face.centroid - edge_center) * nudge
+                    edge_center = (edge.start+edge.end)/2
+                    edge_center += normalize(face.centroid - edge_center) * nudge
 
-                # img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
-                img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
-                
-                if labelVertices:
-                    text.append((flipY(point), f"S{id}V{i}", 0.5 * fontscale))
+                    # img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
+                    img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=int(DRAW_THICKNESS/2))
+                    
+                    if labelVertices:
+                        text.append((flipY(point), f"S{id}V{i}", 0.5 * fontscale))
 
-                if labelEdges:
-                    text.append((flipY(edge_center), f"S{id}E{i}", 0.8 * fontscale))
+                    if labelEdges:
+                        text.append((flipY(edge_center), f"S{id}E{i}", 0.8 * fontscale))
 
-                if labelCentroids:
-                    text.append((flipY(face.centroid), f"S{id}C", 0.5 * fontscale))
+                    if labelCentroids:
+                        text.append((flipY(face.centroid), f"S{id}C", 0.5 * fontscale))
+
+            if drawTris:
+                for tri in self.triangles[id]:
+                    for i in range(len(tri.vertices)):
+                        if tri.inner:
+                            img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,255,0), thickness=DRAW_THICKNESS)
+                        else:
+                            img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,128,0), thickness=int(DRAW_THICKNESS) if DRAW_THICKNESS > 2 else 1)
 
         for t in text:
             drawText(img, position=t[0], text=t[1], scale=t[2])
@@ -508,6 +577,13 @@ class Fortunes:
             edge.ending_sweep = intersection_sweep_value
             self.completed_edges.append(edge)
         
+    
+    def get_closest_face(self, point):
+        for id in self.faces:
+            face = self.faces[id]
+            if isPointInFace(point, face):
+                return face
+        return None
 
 
     def get_faces(self):

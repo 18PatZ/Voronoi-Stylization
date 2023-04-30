@@ -159,7 +159,7 @@ def drawScipyPoints(img, sample_points):
 
 def drawScipyFaces(img, sFaces):
     for polygon in sFaces:
-        img = averagePolygon(img, polygon)
+        img, avg = averagePolygon(img, polygon)
     return img
 
     # masked_image = cv2.bitwise_and(img, mask)

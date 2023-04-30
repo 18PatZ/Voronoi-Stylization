@@ -85,6 +85,20 @@ class Face:
             self.centroid = None
     
 
+class Triangle:
+    sites = []
+    vertices = []
+    inner = True
+
+    def __init__(self, sites, vertices, inner=True):
+        self.sites = sites
+        # self.sites.sort()
+        # self.sites = tuple(self.sites)
+        self.inner = inner
+
+        self.vertices = vertices
+
+
 class Edge:
     start = None
     end = None
@@ -275,6 +289,23 @@ def isPointInPolygon(point, polygon): # assumes vertices are ordered
     for line in polygon:
         point_to_start = line[0] - p
         cross = np.cross([point_to_start[0], point_to_start[1], 0], [line[1][0], line[1][1], 0])
+        s = np.sign(cross[2]) # Z direction
+        if sign is None:
+            sign = s
+        elif s != sign: #flipped signs, that means we're not in polygon
+            return False
+
+    return True
+
+def isPointInFace(point, face): # assumes vertices are ordered
+
+    p = point
+    sign = None
+
+    for edge in face.edges:
+        point_to_start = edge.start - p
+        disp = edge.end - edge.start
+        cross = np.cross([point_to_start[0], point_to_start[1], 0], [disp[0], disp[1], 0])
         s = np.sign(cross[2]) # Z direction
         if sign is None:
             sign = s
