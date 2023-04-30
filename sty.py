@@ -13,8 +13,14 @@ import os
 
 from stylizeUtils import *
 
-filepath = "balloon.jpeg"
-img = cv2.imread(f"input/{filepath}")
+# write = True
+# filepath = "titanfall2.png"
+# img = cv2.imread(f"input/{filepath}")
+
+write = False
+filepath = "black.png"
+# img = np.zeros((1440,2560,3), dtype=np.uint8)
+img = np.zeros((2880, 5120,3), dtype=np.uint8)
 
 spl = filepath.split(".")
 filename = spl[0]
@@ -22,8 +28,9 @@ extension = spl[1]
 
 outPath = f"output/{filename}"
 
-if not os.path.exists(outPath):
-    os.makedirs(outPath)
+if write:
+    if not os.path.exists(outPath):
+        os.makedirs(outPath)
 
 sample_points = []
 
@@ -33,6 +40,7 @@ diag = math.sqrt(height**2 + width**2)
 random.seed(10)
 
 n = 5
+drawVD = False
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -72,7 +80,8 @@ sImg = np.copy(img)
 fImg = np.copy(sImg)
 fImgD = np.copy(sImg)
 
-drawScipyLines(sImg, sLines)
+if drawVD:
+    drawScipyLines(sImg, sLines)
 
 fImgL = np.copy(sImg)
 
@@ -101,26 +110,30 @@ drawScipyFaces(sStylized, sFaces)
 
     # img = cv2.circle(img, center=arrToCvTup(point), radius=2, color=(0, 0, 0), thickness=-1)
 
-cv2.imshow('SciPy Voronoi', sImg)
-cv2.imshow('SciPy Stylized', sStylized)
+if write:
+    if drawVD:
+        cv2.imshow('SciPy Voronoi', sImg)
+    cv2.imshow('SciPy Stylized', sStylized)
 
 
-cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-voronoi.{extension}', sImg)
-cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-stylized.{extension}', sStylized)
+    if drawVD:
+        cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-voronoi.{extension}', sImg)
+    cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-stylized.{extension}', sStylized)
 
 
 start = time.time()
-vp = Fortunes(sites=sites_flipped, img=fImgL)
-vp.process(animate=False, postprocess=False)
+vp = Fortunes(sites=sites_flipped, img=fImgL, filename=filename+f"-{n}")
+vp.process(animate=not write, postprocess=not write)
 print("Fortune's done in ", time.time()-start)
 
-sP = time.time()
-vp.makePolygons()
-print("Fortune's polygonized in ", time.time()-sP)
+if write:
+    sP = time.time()
+    vp.makePolygons()
+    print("Fortune's polygonized in ", time.time()-sP)
 
-sT = time.time()
-vp.triangulate()
-print("Fortune's triangulated in ", time.time()-sT)
+    sT = time.time()
+    vp.triangulate()
+    print("Fortune's triangulated in ", time.time()-sT)
 
 print(f"{len(sample_points)} sites, {len(vp.faces)} faces, {len(vp.triangles)} triangles")
 
@@ -137,8 +150,9 @@ for face_id in faces:
     polygon = []
 
     for edge in face.edges:
-        fImg = cv2.line(fImg, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
-        fImgD = cv2.line(fImgD, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
+        if drawVD:
+            fImg = cv2.line(fImg, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
+            fImgD = cv2.line(fImgD, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=(0, 0, 0), thickness=1)
 
         polygon.append(flipY(edge.start))
     
@@ -162,32 +176,36 @@ s = time.time()
 for tri in vp.triangles:#[face_id]:
     polygon = []
     for i in range(len(tri.vertices)):
-        fImgD = cv2.line(fImgD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,255), thickness=1)
+        if drawVD:
+            fImgD = cv2.line(fImgD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,255), thickness=1)
         # fStylizedD = cv2.line(fStylizedD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,0), thickness=1)
         polygon.append(flipY(tri.vertices[i]))
     fStylizedD, avg = averagePolygon(fStylizedD, polygon)
 
 print("Delaunay stylized in ", time.time()-s)
 
-drawSites(fImg, sample_points)
+# drawSites(fImg, sample_points)
 
-cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-1voronoi.{extension}', fImg)
-cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-2stylizedV.{extension}', fStylized)
-cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-3delaunay.{extension}', fImgD)
-cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-4stylizedD.{extension}', fStylizedD)
+if write:
+    if drawVD:
+        cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-1voronoi.{extension}', fImg)
+    cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-2stylizedV.{extension}', fStylized)
+    if drawVD:
+        cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-3delaunay.{extension}', fImgD)
+    cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-4stylizedD.{extension}', fStylizedD)
 
-s = time.time()
-gourad(fStylizedG, vp.triangles, fStylized, softness=4)
-print("Gouraud shaded in ", time.time()-s)
+    s = time.time()
+    gourad(fStylizedG, vp.triangles, fStylized, softness=0)
+    print("Gouraud shaded in ", time.time()-s)
 
-cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-5stylizedG.{extension}', fStylizedG)
+    cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-5stylizedG.{extension}', fStylizedG)
 
-# cv2.imshow('image2',img2)
-cv2.imshow("Fortune's Voronoi", fImg)
-cv2.imshow("Fortune's Stylized Voronoi", fStylized)
-cv2.imshow("Fortune's Delaunay", fImgD)
-cv2.imshow("Fortune's Stylized Delaunay", fStylizedD)
-cv2.imshow("Fortune's Stylized Gouraud", fStylizedG)
+    # cv2.imshow('image2',img2)
+    cv2.imshow("Fortune's Voronoi", fImg)
+    cv2.imshow("Fortune's Stylized Voronoi", fStylized)
+    cv2.imshow("Fortune's Delaunay", fImgD)
+    cv2.imshow("Fortune's Stylized Delaunay", fStylizedD)
+    cv2.imshow("Fortune's Stylized Gouraud", fStylizedG)
 # cv2.imshow("Fortune's Algorithm", vp.draw())
 # cv2.imshow("Fortune's Algorithm - Delaunay", vp.draw(drawEdges=False, labelSites=False, thickness=1))
 # cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=True, labelCentroids=False))

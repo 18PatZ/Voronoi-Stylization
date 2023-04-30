@@ -8,13 +8,13 @@ from utils import *
 ARC_COLOR = (0,0,255)#(0, 128, 255)
 EDGE_COLOR = (0, 128, 255)
 COMPLETE_COLOR = (0, 255, 255)
-SITE_COLOR = (0, 0, 0)
+SITE_COLOR = (0, 255, 0)#(0, 0, 0)
 
-ANIM_SPEED = 30
+ANIM_SPEED = 2
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
-TEXT_OFFSET = np.array([10, 10])
+TEXT_OFFSET = np.array([0, 50])
 
 
 def drawText(img, position, text, color=(255,255,255), scale=1):
@@ -69,7 +69,7 @@ def drawArc(img, arc, sweep, xMin, xMax):
 
 
 class Fortunes:
-    def __init__(self, sites, img=None, skip_events_outside_img=True):
+    def __init__(self, sites, img=None, skip_events_outside_img=True, filename="fortunes"):
         self.events = PriorityQueue()
         self.beachline = Beachline()
         self.completed_edges = []
@@ -78,6 +78,8 @@ class Fortunes:
         
         # self.img = img
         self.img = np.copy(img)
+
+        self.filename = filename
 
         self.bounding_box = get_image_bounding_box(self.img)
 
@@ -124,11 +126,17 @@ class Fortunes:
         if animate:
             if final_sweep_value is not None and final_sweep_value < last_sweep:
                 self.step_animation(final_sweep_value - ANIM_SPEED)
-                cv2.waitKey(0)
             print("Animation complete.")
+            cv2.waitKey(0)
             
-            cv2.imshow("Fortune's Algorithm", self.draw(drawTris=False))
-            cv2.imshow("Fortune's Algorithm - Delaunay", self.draw(drawEdges=False, drawTris=True))
+            frame = self.draw(drawTris=False)
+            cv2.imshow("Fortune's Algorithm", frame)
+            cv2.imwrite(f'output/fortunes/{self.filename}-final.png', frame)
+            
+            frame = self.draw(drawEdges=False, drawTris=True)
+            cv2.imshow("Fortune's Algorithm - Delaunay", frame)
+            cv2.imwrite(f'output/fortunes/{self.filename}-delaunay.png', frame)
+            
             cv2.waitKey(0)
 
     
@@ -350,8 +358,47 @@ class Fortunes:
         # print("Outer:", outer_faces)
 
                     
+    def draw_circles(self, img, w, sweep):
+        # for i in range(len(self.circles)-1, -1, -1):
+        #     circle = self.circles[i]
+        minCircle = None
+        for i in range(len(self.circles)):
+            if self.is_circle_event_valid(self.circles[i]) and self.circles[i][0].y <= 0:
+                if minCircle is None or self.circles[i][2] > self.circles[minCircle][2]:
+                    minCircle = i
+            
+        # if minCircle is not None:
+        #     circle = self.circles[minCircle]
+        for i in range(len(self.circles)-1, -1, -1):
+            circle = self.circles[i]
+            if not self.is_circle_event_valid(self.circles[i]) or circle[0].y > 0:
+                continue
 
+            # (intersection, dist_to_focus, intersection_sweep_value) = circle
+            (intersection, dist_to_focus, intersection_sweep_value, arc, id) = circle
 
+            leftPoint = arc.prev_endpoint.calculateX(sweep, outputY=True)
+            rightPoint = arc.next_endpoint.calculateX(sweep, outputY=True)
+
+            colorC = (255, 128, 0) if i == minCircle else (128, 128, 128)
+            colorL = (128, 128, 0) if i == minCircle else (64, 64, 64)
+
+            tC = max(DRAW_THICKNESS/2 if i == minCircle else DRAW_THICKNESS/3, 1)
+            tL = max(int(tC/2), 1)
+            tC = int(tC)
+
+            center = npa(intersection)
+            centerCV = arrToCvTup(flipY(center))
+
+            img = cv2.line(img, arrToCvTup(flipY(leftPoint)), centerCV, colorL, thickness=tL)
+            img = cv2.line(img, arrToCvTup(flipY(rightPoint)), centerCV, colorL, thickness=tL)
+            img = cv2.line(img, arrToCvTup(flipY(center - np.array([0, dist_to_focus]))), centerCV, colorL, thickness=tL)
+
+            img = cv2.circle(img, center=centerCV, radius=int(dist_to_focus), color=colorC, thickness=tC)
+            img = cv2.line(img, (0, int(-intersection_sweep_value)), (w-1, int(-intersection_sweep_value)), color=colorC, thickness=tC)
+
+            if sweep <= intersection_sweep_value:
+                del self.circles[i]
 
 
     def draw_animation_frame(self, y):
@@ -364,7 +411,9 @@ class Fortunes:
 
         for i in range(len(self.sites)):
             site = self.sites[i]
-            img = cv2.circle(img, center=arrToCvTup(site), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
+            img = cv2.circle(img, center=arrToCvTup(flipY(site)), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
+
+        self.draw_circles(img, w, sweep)
         
         if DRAW_SWEEP:
             img = cv2.line(img, (0, int(y)), (w-1, int(y)), color=(255, 255, 255), thickness=DRAW_THICKNESS)
@@ -397,19 +446,7 @@ class Fortunes:
                 s = np.array([start[0], -start[1]])
                 e = np.array([end[0], -end[1]])
                 img = cv2.line(img, arrToCvTup(s), arrToCvTup(e), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
-
-        to_remove = []
-        for circle in self.circles:
-            (intersection, dist_to_focus, intersection_sweep_value) = circle
-            img = cv2.circle(img, center=(int(intersection[0]), int(-intersection[1])), radius=int(dist_to_focus), color=(255, 0, 0), thickness=DRAW_THICKNESS)
-            img = cv2.line(img, (0, int(-intersection_sweep_value)), (w-1, int(-intersection_sweep_value)), color=(255, 0, 0), thickness=DRAW_THICKNESS)
-
-            if sweep <= intersection_sweep_value:
-                to_remove.append(circle)
-        for circle in to_remove:
-            self.circles.remove(circle)
-
-
+        
         for i in range(len(self.sites)):
             site = self.sites[i]
             img = drawText(img, flipY(site), f"S{i}", scale=1)
@@ -449,7 +486,7 @@ class Fortunes:
 
         for i in range(len(self.sites)):
             site = self.sites[i]
-            img = cv2.circle(img, center=arrToCvTup(site), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
+            img = cv2.circle(img, center=arrToCvTup(flipY(site)), radius=DRAW_THICKNESS, color=SITE_COLOR, thickness=-1)
 
         text = []
         
@@ -504,7 +541,8 @@ class Fortunes:
         for y in range(int(self.lastY), -int(target_sweep), ANIM_SPEED):
             # cv2.namedWindow("Fortune's Algorithm", cv2.WINDOW_NORMAL)
             # img = resizeImgToScreen(img) 
-            cv2.imshow("Fortune's Algorithm", self.draw_animation_frame(y))
+            frame = self.draw_animation_frame(y)
+            cv2.imshow("Fortune's Algorithm", frame)
 
             # print(sweep, target_sweep)
             
@@ -513,7 +551,11 @@ class Fortunes:
                 key = cv2.waitKey(0)
             if key & 0xFF == ord('p'):
                 self.makePolygons(check_unfinished=True, sweep=target_sweep)
-                cv2.imshow("Fortune's Algorithm", self.draw_animation_frame(y))
+                frame = self.draw_animation_frame(y)
+                cv2.imshow("Fortune's Algorithm", frame)
+                key = cv2.waitKey(0)
+            if key & 0xFF == ord('s'):
+                cv2.imwrite(f'output/fortunes/{self.filename}-sweep-{int(y)}.png', frame)
                 key = cv2.waitKey(0)
             if key & 0xFF == ord('q'):
                 exit()
@@ -555,15 +597,18 @@ class Fortunes:
             return
         # print("Adding circle event INT", intersection, " SWP", intersection_sweep_value)
 
+        event = (pt(intersection), dist_to_focus, intersection_sweep_value, arc, self.circle_counter)
+
         self.events.push(
             value=intersection_sweep_value, 
-            item=(pt(intersection), dist_to_focus, intersection_sweep_value, arc, self.circle_counter), 
+            item=event, 
             type="CIRCLE")
 
         self.latest_arc_event_ids[arc.id] = self.circle_counter
         self.circle_counter += 1
 
         # self.circles.append((intersection, dist_to_focus, intersection_sweep_value))
+        self.circles.append(event)
 
     def is_circle_event_valid(self, event):
         (intersection, dist_to_focus, intersection_sweep_value, arc, id) = event
