@@ -294,6 +294,8 @@ class Fortunes:
         # self.triangles = {}
         self.triangles = []
 
+        self.occupied = set()
+
         outer_faces = []
 
         for id in self.faces:
@@ -311,7 +313,12 @@ class Fortunes:
                         other1 = edge.site1_id if edge.site1_id != id else edge.site2_id
                         other2 = next_edge.site1_id if next_edge.site1_id != id else next_edge.site2_id
 
-                        self.triangles.append(Triangle(sites=[id, other1, other2], vertices=[self.sites[id], self.sites[other1], self.sites[other2]]))
+                        sites = [id, other1, other2]
+                        tag = order3(sites[0], sites[1], sites[2])
+
+                        if tag not in self.occupied:
+                            self.occupied.add(tag)
+                            self.triangles.append(Triangle(sites, vertices=[self.sites[id], self.sites[other1], self.sites[other2]]))
                     else:
                         if edge.boundary_start is not None and edge.boundary_end is not None:
                             has_boundary = True

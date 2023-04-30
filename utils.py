@@ -63,6 +63,18 @@ def order2(a, b):
         return (a, b)
     return (b, a)
 
+def order3(a, b, c):
+    if a <= b:
+        if a <= c: # a < b c
+            return (a,) + order2(b, c)
+        else: # c < a < b
+            return (c, a, b)
+    else:
+        if b <= c: # b < a c
+            return (b,) + order2(a, c)
+        else: # c < b < a
+            return (c, b, a)
+
 
 class Face:
     site = None
