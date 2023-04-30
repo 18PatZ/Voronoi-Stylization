@@ -11,8 +11,13 @@ from fortunes import Fortunes
 
 from stylizeUtils import *
 
-filepath = "titanfall2.png"
+filepath = "IMG_2374.jpeg"
 img = cv2.imread(f"input/{filepath}")
+
+spl = filepath.split(".")
+filename = spl[0]
+extension = spl[1]
+
 
 sample_points = []
 
@@ -21,7 +26,7 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 3
+n = 5
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -71,6 +76,7 @@ fImgL = np.copy(sImg)
 sStylized = img.copy()
 fStylized = img.copy()
 fStylizedD = img.copy()
+fStylizedG = img.copy()
 
 drawScipyFaces(sStylized, sFaces)
 
@@ -92,10 +98,30 @@ drawScipyFaces(sStylized, sFaces)
 cv2.imshow('SciPy Voronoi', sImg)
 cv2.imshow('SciPy Stylized', sStylized)
 
+
+cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
+cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
+
+
 start = time.time()
 vp = Fortunes(sites=sites_flipped, img=fImgL)
-vp.process(animate=False)
+vp.process(animate=False, postprocess=False)
 print("Fortune's done in ", time.time()-start)
+
+sP = time.time()
+vp.makePolygons()
+print("Fortune's polygonized in ", time.time()-sP)
+
+sT = time.time()
+vp.triangulate()
+print("Fortune's triangulated in ", time.time()-sT)
+
+print(f"{len(sample_points)} sites, {len(vp.faces)} faces, {len(vp.triangles)} triangles")
+
+print("Fortune's total ", time.time()-start)
+
+
+s = time.time()
 
 faces = vp.get_faces()
 face_colors = {}
@@ -113,6 +139,10 @@ for face_id in faces:
     fStylized, avg = averagePolygon(fStylized, polygon)
     face_colors[face_id] = np.array(avg)
 
+print("Voronoi stylized in ", time.time()-s)
+s = time.time()
+
+
 # fStylizedD = np.copy(fStylized)
 
 # for i in range(100):
@@ -122,22 +152,36 @@ for face_id in faces:
 #         tup = arrToCvTup(new_point)
 #         fStylized[tup[1]][tup[0]] = img[tup[1]][tup[0]]
 
-for face_id in faces:
+# for face_id in faces:
+for tri in vp.triangles:#[face_id]:
     polygon = []
-    for tri in vp.triangles[face_id]:
-        for i in range(len(tri.vertices)):
-            fImgD = cv2.line(fImgD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,255), thickness=1)
-            # fStylizedD = cv2.line(fStylizedD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,0), thickness=1)
-#             polygon.append(flipY(tri.vertices[i]))
-#     fStylizedD, avg = averagePolygon(fStylizedD, polygon)
-gourad(fStylizedD, vp.triangles, face_colors)
+    for i in range(len(tri.vertices)):
+        fImgD = cv2.line(fImgD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,255), thickness=1)
+        # fStylizedD = cv2.line(fStylizedD, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,0,0), thickness=1)
+        polygon.append(flipY(tri.vertices[i]))
+    fStylizedD, avg = averagePolygon(fStylizedD, polygon)
+
+print("Delaunay stylized in ", time.time()-s)
+
+
+cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-delaunay.{extension}', fImgD)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedV.{extension}', fStylized)
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedD.{extension}', fStylizedD)
+
+s = time.time()
+gourad(fStylizedG, vp.triangles, face_colors)
+print("Gouraud shaded in ", time.time()-s)
+
+cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedG.{extension}', fStylizedG)
 
 # cv2.imshow('image2',img2)
 cv2.imshow("Fortune's Voronoi", fImg)
 cv2.imshow("Fortune's Stylized Voronoi", fStylized)
 cv2.imshow("Fortune's Delaunay", fImgD)
 cv2.imshow("Fortune's Stylized Delaunay", fStylizedD)
-cv2.imshow("Fortune's Algorithm", vp.draw())
+cv2.imshow("Fortune's Stylized Gouraud", fStylizedG)
+# cv2.imshow("Fortune's Algorithm", vp.draw())
 # cv2.imshow("Fortune's Algorithm - Delaunay", vp.draw(drawEdges=False, labelSites=False, thickness=1))
 # cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=True, labelCentroids=False))
 # cv2.imshow("Fortune's Algorithm", vp.draw(labelEdges=False, labelVertices=False, labelSites=False, labelCentroids=False, fontscale=0.5, thickness=1))
@@ -146,17 +190,13 @@ cv2.imshow("Fortune's Algorithm", vp.draw())
 
 
 
-spl = filepath.split(".")
-filename = spl[0]
-extension = spl[1]
+# cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
+# cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
 
-cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
-cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
-
-cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-delaunay.{extension}', fImgD)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedV.{extension}', fStylized)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedD.{extension}', fStylizedD)
+# cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
+# cv2.imwrite(f'output/{filename}-{n}-fortunes-delaunay.{extension}', fImgD)
+# cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedV.{extension}', fStylized)
+# cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedD.{extension}', fStylizedD)
 
 cv2.waitKey(0)
 

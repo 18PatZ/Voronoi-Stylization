@@ -82,7 +82,7 @@ class Fortunes:
         self.bounding_box = get_image_bounding_box(self.img)
 
         self.faces = {}
-        self.triangles = {}
+        self.triangles = []
         
         self.skip_events_outside_img = skip_events_outside_img
         self.min_intersection_y = -self.img.shape[0] # don't wait for circle events if they're outside of the image
@@ -101,7 +101,7 @@ class Fortunes:
                 type = "SITE") 
 
 
-    def process(self, animate=True):
+    def process(self, animate=True, postprocess=True):
         while not self.events.empty():
             value, event, type = self.events.pop()
             
@@ -117,8 +117,9 @@ class Fortunes:
         last_sweep = -self.lastY
         final_sweep_value = self.finish_edges(self.bounding_box)
 
-        self.makePolygons()
-        self.triangulate()
+        if postprocess:
+            self.makePolygons()
+            self.triangulate()
         
         if animate:
             if final_sweep_value is not None and final_sweep_value < last_sweep:
@@ -290,14 +291,15 @@ class Fortunes:
 
     
     def triangulate(self):
-        self.triangles = {}
+        # self.triangles = {}
+        self.triangles = []
 
         outer_faces = []
 
         for id in self.faces:
             face = self.faces[id]
 
-            tris = []
+            # tris = []
             has_boundary = False
             
             if len(face.edges) > 1:
@@ -309,7 +311,7 @@ class Fortunes:
                         other1 = edge.site1_id if edge.site1_id != id else edge.site2_id
                         other2 = next_edge.site1_id if next_edge.site1_id != id else next_edge.site2_id
 
-                        tris.append(Triangle(sites=[id, other1, other2], vertices=[self.sites[id], self.sites[other1], self.sites[other2]]))
+                        self.triangles.append(Triangle(sites=[id, other1, other2], vertices=[self.sites[id], self.sites[other1], self.sites[other2]]))
                     else:
                         if edge.boundary_start is not None and edge.boundary_end is not None:
                             has_boundary = True
@@ -322,19 +324,17 @@ class Fortunes:
                             if prev_edge.site1_id != prev_edge.site2_id:
                                 other = prev_edge.site1_id if prev_edge.site1_id != id else prev_edge.site2_id
                                 id2 = (id, other)
-                                tris.append(Triangle(sites=[id, other, id2], vertices=[self.sites[id], self.sites[other], edge.start], inner=False))
+                                self.triangles.append(Triangle(sites=[id, other, id2], vertices=[self.sites[id], self.sites[other], edge.start], inner=False))
                             
                             id3 = id
                             if next_edge.site1_id != next_edge.site2_id:
                                 other = next_edge.site1_id if next_edge.site1_id != id else next_edge.site2_id
                                 id3 = (id, other)
-                                tris.append(Triangle(sites=[id, id3, other], vertices=[self.sites[id], next_edge.start, self.sites[other]], inner=False))
+                                self.triangles.append(Triangle(sites=[id, id3, other], vertices=[self.sites[id], next_edge.start, self.sites[other]], inner=False))
                             
-                            tris.append(Triangle(sites=[id, id2, id3], vertices=[self.sites[id], edge.start, edge.end], inner=False))
+                            self.triangles.append(Triangle(sites=[id, id2, id3], vertices=[self.sites[id], edge.start, edge.end], inner=False))
 
-
-            
-            self.triangles[id] = tris
+            # self.triangles[id] = tris
 
             if has_boundary:
                 outer_faces.append(id)
@@ -478,7 +478,7 @@ class Fortunes:
                         text.append((flipY(face.centroid), f"S{id}C", 0.5 * fontscale))
 
             if drawTris:
-                for tri in self.triangles[id]:
+                for tri in self.triangles:#[id]:
                     for i in range(len(tri.vertices)):
                         if tri.inner:
                             img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,255,0), thickness=DRAW_THICKNESS)

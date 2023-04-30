@@ -42,57 +42,134 @@ def getColor(vertice_colors, ind):
         return sum / len(ind)
     else:
         return vertice_colors[ind][:3]
-        
+
+def mul(a, b) :
+    # Multiply two vectors into a matrix
+    return np.asmatrix(b).T @ np.asmatrix(a)
+
+def shadeTri(img, v1, v2, v3, c1, c2, c3, flipY=True):
+    # Source: https://stackoverflow.com/questions/61854897/how-to-apply-a-three-point-triangle-gradient-in-opencv
+    
+    # Make array of vertices
+    # ax bx cx
+    # ay by cy
+    #  1  1  1
+    a = v1
+    b = v2
+    c = v3
+
+    triArr = np.asarray([int(a[0]), int(b[0]), int(c[0]), int(a[1]), int(b[1]), int(c[1]), 1,1,1]).reshape((3, 3))
+
+    # Get bounding box of the triangle
+    xleft = min(int(a[0]), int(b[0]), int(c[0]))
+    xright = max(int(a[0]), int(b[0]), int(c[0]))
+
+    ytop = min(int(a[1]), int(b[1]), int(c[1]))
+    ybottom = max(int(a[1]), int(b[1]), int(c[1]))
+
+    # Build np arrays of coordinates of the bounding box
+    xs = range(xleft, xright)
+    ys = range(ytop, ybottom)
+    xv, yv = np.meshgrid(xs, ys)
+    xv = xv.flatten()
+    yv = yv.flatten()
+
+    # Compute all least-squares /
+    p = np.array([xv, yv, [1] * len(xv)])
+    alphas, betas, gammas = np.linalg.lstsq(triArr, p, rcond=-1)[0]
+
+    # Apply mask for pixels within the triangle only
+    mask = (alphas > 0) & (betas > 0) & (gammas > 0)
+    alphas_m = alphas[mask]
+    betas_m = betas[mask]
+    gammas_m = gammas[mask]
+    xv_m = xv[mask]
+    yv_m = yv[mask]
+
+    # Compute and assign colors
+    colors = mul(c1, alphas_m) + mul(c2, betas_m) + mul(c3, gammas_m)
+
+    if flipY:
+        yv_m *= -1
+    
+    xv_m = np.clip(xv_m, 0, img.shape[1]-1)
+    yv_m = np.clip(yv_m, 0, img.shape[0]-1)
+
+    if len(xv_m) > 0 and len(yv_m) > 0: # i guess sometimes the triangles are lines
+        img[yv_m, xv_m] = colors
+
+    return img
+
 
 def gourad(img, triangles, vertice_colors):
-    for face_id in triangles:
-        for tri in triangles[face_id]:
-            lowest, lowest_ind, highest, highest_ind = topBottomTriVert(tri.vertices)
+    # for face_id in triangles:
+    #     for tri in triangles[face_id]:
+    for tri in triangles:
+        v1 = tri.vertices[0]
+        v2 = tri.vertices[1]
+        v3 = tri.vertices[2]
 
-            lV = tri.vertices[lowest_ind-1]
-            rV = tri.vertices[(lowest_ind+1)%len(tri.vertices)]
+        c1 = getColor(vertice_colors, tri.sites[0])
+        c2 = getColor(vertice_colors, tri.sites[1])
+        c3 = getColor(vertice_colors, tri.sites[2])
 
-            cL = getColor(vertice_colors, tri.sites[lowest_ind-1])
-            cR = getColor(vertice_colors, tri.sites[(lowest_ind+1)%len(tri.vertices)])
-            cB = getColor(vertice_colors, tri.sites[lowest_ind])
+        img = shadeTri(img, v1, v2, v3, c1, c2, c3, flipY=True)
 
-            left = (lV - lowest)
-            right = (rV - lowest)
-            topleft = rV - lV
 
-            height = int(highest[1]) - int(lowest[1])
-            for i in range(height+1):
-                y = int(lowest[1]) + i
+# def gourad(img, triangles, vertice_colors):
+#     for face_id in triangles:
+#         for tri in triangles[face_id]:
+#             lowest, lowest_ind, highest, highest_ind = topBottomTriVert(tri.vertices)
 
-                if i >= left[1]:
-                    leftPos = lV + topleft * (i - left[1]) / topleft[1]
-                    t = (i - left[1]) / topleft[1]
-                    leftColor = (1-t) * cL + t * cR
-                else:
-                    leftPos = lowest + left * (i / left[1])
-                    t = i / left[1]
-                    leftColor = (1-t) * cB + t * cL
+#             lV = tri.vertices[lowest_ind-1]
+#             rV = tri.vertices[(lowest_ind+1)%len(tri.vertices)]
 
-                if i >= right[1]:
-                    rightPos = rV + (-topleft) * (i - right[1]) / (-topleft[1])
-                    t = (i - right[1]) / (-topleft[1])
-                    rightColor = (1-t) * cR + t * cL
-                else:
-                    rightPos = lowest + right * (i / right[1])
-                    t = i / right[1]
-                    rightColor = (1-t) * cB + t * cR
-                    # print("B",rightPos,right, tri.vertices)
+#             cL = getColor(vertice_colors, tri.sites[lowest_ind-1])
+#             cR = getColor(vertice_colors, tri.sites[(lowest_ind+1)%len(tri.vertices)])
+#             cB = getColor(vertice_colors, tri.sites[lowest_ind])
 
-                # rightColor=leftColor
+#             left = (lV - lowest)
+#             right = (rV - lowest)
+#             topleft = rV - lV
 
-                width = int((rightPos - leftPos)[0])
-                for j in range(width+1):
-                    x = int(leftPos[0]) + j
-                    t = float(j) / width if width > 0 else 0
-                    color = (1-t) * leftColor + t * rightColor
+#             height = int(highest[1]) - int(lowest[1])
+#             for i in range(height+1):
+#                 y = int(lowest[1]) + i
 
-                    if abs(y) < img.shape[0] and abs(x) < img.shape[1]:
-                        img[-y][x] = tuple(color)
+#                 if i >= left[1]:
+#                     leftPos = lV + topleft * (i - left[1]) / topleft[1]
+#                     t = (i - left[1]) / topleft[1]
+#                     leftColor = (1-t) * cL + t * cR
+#                 else:
+#                     leftPos = lowest + left * (i / left[1])
+#                     t = i / left[1]
+#                     leftColor = (1-t) * cB + t * cL
+
+#                  # need to vectorize, fix jaggies
+#                 x = int(leftPos[0])
+#                 if abs(y) < img.shape[0] and abs(x) < img.shape[1]:
+#                     img[-y][x] = tuple(leftColor)
+
+#                 if i >= right[1]:
+#                     rightPos = rV + (-topleft) * (i - right[1]) / (-topleft[1])
+#                     t = (i - right[1]) / (-topleft[1])
+#                     rightColor = (1-t) * cR + t * cL
+#                 else:
+#                     rightPos = lowest + right * (i / right[1])
+#                     t = i / right[1]
+#                     rightColor = (1-t) * cB + t * cR
+#                     # print("B",rightPos,right, tri.vertices)
+
+#                 # rightColor=leftColor
+
+#                 width = int((rightPos - leftPos)[0])
+#                 for j in range(width+1):
+#                     x = int(leftPos[0]) + j
+#                     t = float(j) / width if width > 0 else 0
+#                     color = (1-t) * leftColor + t * rightColor
+
+#                     if abs(y) < img.shape[0] and abs(x) < img.shape[1]:
+#                         img[-y][x] = tuple(color)
 
     # for face_id in triangles:
     #     for tri in triangles[face_id]:
