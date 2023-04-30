@@ -151,7 +151,7 @@ def drawScipyLines(img, sLines):
         img = cv2.line(img, arrToCvTup(line[0]), arrToCvTup(line[1]), color=(0, 0, 0), thickness=1)
     return img
 
-def drawScipyPoints(img, sample_points):
+def drawSites(img, sample_points):
     c = (0, 0, 0)
     for point in sample_points:
         img = cv2.circle(img, center=arrToCvTup(point), radius=4, color=c, thickness=-1)

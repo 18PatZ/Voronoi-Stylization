@@ -9,15 +9,21 @@ from scipyVoronoi import *
 from Voronoi import Voronoi as Vr
 from fortunes import Fortunes
 
+import os
+
 from stylizeUtils import *
 
-filepath = "IMG_2374.jpeg"
+filepath = "balloon.jpeg"
 img = cv2.imread(f"input/{filepath}")
 
 spl = filepath.split(".")
 filename = spl[0]
 extension = spl[1]
 
+outPath = f"output/{filename}"
+
+if not os.path.exists(outPath):
+    os.makedirs(outPath)
 
 sample_points = []
 
@@ -99,8 +105,8 @@ cv2.imshow('SciPy Voronoi', sImg)
 cv2.imshow('SciPy Stylized', sStylized)
 
 
-cv2.imwrite(f'output/{filename}-{n}-scipy-voronoi.{extension}', sImg)
-cv2.imwrite(f'output/{filename}-{n}-scipy-stylized.{extension}', sStylized)
+cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-voronoi.{extension}', sImg)
+cv2.imwrite(f'{outPath}/{filename}-{n}-scipy-stylized.{extension}', sStylized)
 
 
 start = time.time()
@@ -163,17 +169,18 @@ for tri in vp.triangles:#[face_id]:
 
 print("Delaunay stylized in ", time.time()-s)
 
+drawSites(fImg, sample_points)
 
-cv2.imwrite(f'output/{filename}-{n}-fortunes-voronoi.{extension}', fImg)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-delaunay.{extension}', fImgD)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedV.{extension}', fStylized)
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedD.{extension}', fStylizedD)
+cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-1voronoi.{extension}', fImg)
+cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-2stylizedV.{extension}', fStylized)
+cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-3delaunay.{extension}', fImgD)
+cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-4stylizedD.{extension}', fStylizedD)
 
 s = time.time()
-gourad(fStylizedG, vp.triangles, face_colors)
+gourad(fStylizedG, vp.triangles, fStylized, softness=4)
 print("Gouraud shaded in ", time.time()-s)
 
-cv2.imwrite(f'output/{filename}-{n}-fortunes-stylizedG.{extension}', fStylizedG)
+cv2.imwrite(f'{outPath}/{filename}-{n}-fortunes-5stylizedG.{extension}', fStylizedG)
 
 # cv2.imshow('image2',img2)
 cv2.imshow("Fortune's Voronoi", fImg)

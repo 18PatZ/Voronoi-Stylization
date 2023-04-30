@@ -339,7 +339,8 @@ class Fortunes:
                                 id3 = (id, other)
                                 self.triangles.append(Triangle(sites=[id, id3, other], vertices=[self.sites[id], next_edge.start, self.sites[other]], inner=False))
                             
-                            self.triangles.append(Triangle(sites=[id, id2, id3], vertices=[self.sites[id], edge.start, edge.end], inner=False))
+                            if edge.site1_id == edge.site2_id:
+                                self.triangles.append(Triangle(sites=[id, id2, id3], vertices=[self.sites[id], edge.start, edge.end], inner=False))
 
             # self.triangles[id] = tris
 

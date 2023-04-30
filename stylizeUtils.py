@@ -101,7 +101,29 @@ def shadeTri(img, v1, v2, v3, c1, c2, c3, flipY=True):
     return img
 
 
-def gourad(img, triangles, vertice_colors):
+def colorAtRegion(v, region_colors):
+    x = int(v[0])
+    y = int(-v[1])
+
+    x = np.clip(x, 0, region_colors.shape[1]-1)
+    y = np.clip(y, 0, region_colors.shape[0]-1)
+
+    return region_colors[y][x]
+
+def colorAroundRegion(v, region_colors, spread=1):
+    c = np.array([0., 0., 0.])
+    n = 0
+    for i in range(-spread, spread+1):
+        for j in range(-spread, spread+1):
+            c += colorAtRegion(v + np.array([i, j]), region_colors)
+            n += 1
+    return c / n
+
+def colorTup(c):
+    return (int(c[0]), int(c[1]), int(c[2]))
+
+
+def gourad(img, triangles, region_colors, softness=0):#vertice_colors):
     # for face_id in triangles:
     #     for tri in triangles[face_id]:
     for tri in triangles:
@@ -109,11 +131,35 @@ def gourad(img, triangles, vertice_colors):
         v2 = tri.vertices[1]
         v3 = tri.vertices[2]
 
-        c1 = getColor(vertice_colors, tri.sites[0])
-        c2 = getColor(vertice_colors, tri.sites[1])
-        c3 = getColor(vertice_colors, tri.sites[2])
+        # c1 = colorAtRegion(v1, region_colors)
+        # c2 = colorAtRegion(v2, region_colors)
+        # c3 = colorAtRegion(v3, region_colors)
+        c1 = colorAroundRegion(v1, region_colors, spread=softness)
+        c2 = colorAroundRegion(v2, region_colors, spread=softness)
+        c3 = colorAroundRegion(v3, region_colors, spread=softness)
+
+        # c1 = getColor(vertice_colors, tri.sites[0])
+        # c2 = getColor(vertice_colors, tri.sites[1])
+        # c3 = getColor(vertice_colors, tri.sites[2])
 
         img = shadeTri(img, v1, v2, v3, c1, c2, c3, flipY=True)
+
+    # for tri in triangles:
+    #     v1 = tri.vertices[0]
+    #     v2 = tri.vertices[1]
+    #     v3 = tri.vertices[2]
+
+    #     c1 = colorAroundRegion(v1, region_colors, spread=5)
+    #     c2 = colorAroundRegion(v2, region_colors, spread=5)
+    #     c3 = colorAroundRegion(v3, region_colors, spread=5)
+    
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v1)), radius=10, color=(0,0,0), thickness=-1)
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v2)), radius=10, color=(0,0,0), thickness=-1)
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v3)), radius=10, color=(0,0,0), thickness=-1)
+
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v1)), radius=6, color=colorTup(c1), thickness=-1)
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v2)), radius=6, color=colorTup(c2), thickness=-1)
+    #     img = cv2.circle(img, center=arrToCvTup(flipY(v3)), radius=6, color=colorTup(c3), thickness=-1)
 
 
 # def gourad(img, triangles, vertice_colors):
