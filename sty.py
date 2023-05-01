@@ -13,14 +13,15 @@ import os
 
 from stylizeUtils import *
 
-# write = True
-# filepath = "titanfall2.png"
-# img = cv2.imread(f"input/{filepath}")
+write = True
+filepath = "balloon.jpeg"
+img = cv2.imread(f"input/{filepath}")
 
-write = False
-filepath = "black.png"
+# write = False
+# filepath = "black.png"
 # img = np.zeros((1440,2560,3), dtype=np.uint8)
-img = np.zeros((2880, 5120,3), dtype=np.uint8)
+# img = np.zeros((2560,5120,3), dtype=np.uint8)
+# img = np.zeros((2880, 5120,3), dtype=np.uint8)
 
 spl = filepath.split(".")
 filename = spl[0]
@@ -39,8 +40,8 @@ diag = math.sqrt(height**2 + width**2)
 
 random.seed(10)
 
-n = 5
-drawVD = False
+n = 50
+drawVD = True
 
 # for i in range(0, n):
 #     x = (i+0.5) * width / n
@@ -50,6 +51,47 @@ drawVD = False
 #         sample_points.append([x, y])
 for i in range(0, n**2):
     sample_points.append([random.random() * width, random.random() * height])
+    # p = np.array([i * width / (n**2) * 15.0/16.0 + width/32.0, i * height / (n**2) / 2 + height/4])
+    # p += np.array([random.random() * width/16 - width/32, random.random() * height/16 - height/8])
+    
+    # angle = i * 90.0 / (n**2) * (math.pi / 180)
+    # x = math.sin(angle) * width * 3.0/4.0 + width / 8
+    # y = height-(math.cos(angle) * 3.0/4.0 * height + height / 8) + (i * height /8 / (n**2))
+
+    # x = i / (n**2)
+    # y = x**2 * height/8# - height/32
+
+    # p = [width-(x * width * 6.0/8.0 + width / 4 + width * 0/8), height-y]
+
+    ###
+    # x = i / (n**2) * width/2
+    # y = (((x - width/2) / 5) ** 2 ) / 70
+
+    # y = height - y
+    
+    # p = [x * 2.4/4.0 + width/8, y/2 + height * 1.5/4.0]
+    ###
+
+    ###
+    # x = i / (n**2) * width
+    # y = (((x - width) / 5) ** 2 ) / 70
+
+    # y = y
+    
+    # p = [x * 2.4/4.0 - width*4/16, y]
+    ###
+
+    ###
+    # x = i / (n**2) * width
+    # y = (height/2)*math.sin(x / width * 20) + height/2#(((x - 2500) / 5) ** 2 ) / 70
+    
+    # # p = [x * 2.4/4.0 + width/8, y]
+    # p = [y, x]
+    ###
+
+    # p = [x, y]
+
+    # sample_points.append(p)
     # sample_points.append([random.random() * width, 200])
 
 # sample_points = [

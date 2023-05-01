@@ -10,7 +10,7 @@ EDGE_COLOR = (0, 128, 255)
 COMPLETE_COLOR = (0, 255, 255)
 SITE_COLOR = (0, 255, 0)#(0, 0, 0)
 
-ANIM_SPEED = 2
+ANIM_SPEED = 4
 DRAW_SWEEP = True
 DRAW_THICKNESS = 6
 
@@ -104,6 +104,10 @@ class Fortunes:
 
 
     def process(self, animate=True, postprocess=True):
+
+        # self.step_animation(-1)
+        # cv2.waitKey(0)
+
         while not self.events.empty():
             value, event, type = self.events.pop()
             
@@ -133,9 +137,9 @@ class Fortunes:
             cv2.imshow("Fortune's Algorithm", frame)
             cv2.imwrite(f'output/fortunes/{self.filename}-final.png', frame)
             
-            frame = self.draw(drawEdges=False, drawTris=True)
-            cv2.imshow("Fortune's Algorithm - Delaunay", frame)
-            cv2.imwrite(f'output/fortunes/{self.filename}-delaunay.png', frame)
+            # frame = self.draw(labelEdges=False, labelVertices=False, labelCentroids=False, drawEdges=True, drawTris=True)
+            # cv2.imshow("Fortune's Algorithm - Delaunay", frame)
+            # cv2.imwrite(f'output/fortunes/{self.filename}-delaunay.png', frame)
             
             cv2.waitKey(0)
 
@@ -495,23 +499,25 @@ class Fortunes:
                 site = self.sites[i]
                 text.append((flipY(site), "S"+str(i), fontscale))
         
-        for id in self.faces:
-            face = self.faces[id]
-            edges = face.edges
+        if drawEdges:
+            for id in self.faces:
+                face = self.faces[id]
+                edges = face.edges
             
-            if drawEdges:
                 for i in range(len(edges)):
                     edge = edges[i]
                     nudge = 50
                     point = edge.start + normalize(face.centroid - edge.start) * nudge
                     
-                    img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=DRAW_THICKNESS)
+                    thick = DRAW_THICKNESS if not drawTris else min(int(DRAW_THICKNESS/2), 1)
+                    img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(edge.end)), color=COMPLETE_COLOR, thickness=thick)
 
                     edge_center = (edge.start+edge.end)/2
                     edge_center += normalize(face.centroid - edge_center) * nudge
 
-                    # img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
-                    img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=int(DRAW_THICKNESS/2))
+                    if not drawTris:
+                        # img = cv2.line(img, arrToCvTup(flipY(point)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=1)
+                        img = cv2.line(img, arrToCvTup(flipY(edge.start)), arrToCvTup(flipY(face.site)), color=(128,128,0), thickness=int(DRAW_THICKNESS/2))
                     
                     if labelVertices:
                         text.append((flipY(point), f"S{id}V{i}", 0.5 * fontscale))
@@ -522,13 +528,15 @@ class Fortunes:
                     if labelCentroids:
                         text.append((flipY(face.centroid), f"S{id}C", 0.5 * fontscale))
 
-            if drawTris:
-                for tri in self.triangles:#[id]:
-                    for i in range(len(tri.vertices)):
-                        if tri.inner:
-                            img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,255,0), thickness=DRAW_THICKNESS)
-                        else:
-                            img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,128,0), thickness=int(DRAW_THICKNESS) if DRAW_THICKNESS > 2 else 1)
+        if drawTris:
+            for tri in self.triangles:
+                for i in range(len(tri.vertices)):
+                    if not tri.inner:
+                        img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,100,0), thickness=max(int(DRAW_THICKNESS), 1))
+            for tri in self.triangles:
+                for i in range(len(tri.vertices)):
+                    if tri.inner:
+                        img = cv2.line(img, arrToCvTup(flipY(tri.vertices[i])), arrToCvTup(flipY(tri.vertices[i-1])), color=(0,255,0), thickness=DRAW_THICKNESS)
 
         for t in text:
             drawText(img, position=t[0], text=t[1], scale=t[2])
